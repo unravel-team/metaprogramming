@@ -1,0 +1,100 @@
+name: scaffolds
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Regenerate docs
+        run: make format
+
+      - name: Verify generated docs are committed
+        run: git diff --exit-code
+
+      - name: Run repository checks
+        run: make check
+
+      - name: Run repository tests
+        run: make test
+
+  smoke:
+    needs: metadata
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [typescript, python, clojure, golang]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install tagref
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl https://raw.githubusercontent.com/stepchowfun/tagref/main/install.sh -LSfs | VERSION="1.10.0" PREFIX="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Bun
+        if: matrix.language == 'typescript'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.6"
+
+      - name: Set up Node.js
+        if: matrix.language == 'typescript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up uv
+        if: matrix.language == 'python'
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.10.2"
+
+      - name: Set up Java
+        if: matrix.language == 'clojure'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Clojure CLI and clj-kondo
+        if: matrix.language == 'clojure'
+        uses: DeLaGuardo/setup-clojure@13.2
+        with:
+          cli: 1.12.4.1602
+          clj-kondo: 2026.01.19
+
+      - name: Set up Go
+        if: matrix.language == 'golang'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install Go tools
+        if: matrix.language == 'golang'
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install gotest.tools/gotestsum@latest
+
+      - name: Run scaffold smoke test
+        run: python3 scripts/smoke_scaffolds.py --language "${{ matrix.language }}"

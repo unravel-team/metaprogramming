@@ -1,6 +1,6 @@
-# TypeScript scaffold
+# Clojure scaffold
 
-A Bun-powered TypeScript starter with Biome, Vitest, and tagref checks.
+A minimal Clojure starter with tools.build, test-runner, zprint via alias, clj-kondo, and tagref.
 
 ## Quickstart
 
@@ -13,17 +13,18 @@ A Bun-powered TypeScript starter with Biome, Vitest, and tagref checks.
 ```text
 help                      # List the supported scaffold commands
 doctor                    # Verify toolchain prerequisites and platform assumptions
+install-kondo-configs     # Download clj-kondo configs from project dependencies
+install-zprint-config     # Confirm the committed zprint configuration
+install-gitignore         # Confirm the committed gitignore
 init                      # Bootstrap dependencies and one-time setup
 install                   # Alias for init
 install-dev-tools         # Alias for init
-check                     # Run linting, typing, and docs validation
-format                    # Apply Biome formatting
+check                     # Run linting, formatting checks, and docs validation
+format                    # Apply canonical formatting
 test                      # Run the default test suite
-test-watch                # Run tests in watch mode
-test-coverage             # Run tests with coverage
 build                     # Produce the default build artifact
-dev                       # Run the starter project in watch mode
-upgrade-libs              # Upgrade scaffold dependencies
+repl                      # Launch a REPL using the Clojure CLI
+upgrade-libs              # Update scaffold dependencies interactively
 clean                     # Remove generated artifacts
 ```
 
@@ -34,25 +35,25 @@ Support files:
 - `README.md`
 - `.aider.conf.yml`
 - `.gitignore`
-- `biome.json`
-- `bun.lock`
-- `package.json`
-- `tsconfig.json`
+- `.zprint.edn`
+- `.dir-locals.el`
+- `deps.edn`
+- `build.clj`
 - `dev_tools/hooks/pre-push`
 - `dev_tools/configuration/direnv.toml`
 
 Starter code:
-- `src/index.ts`
-- `tests/smoke.test.ts`
+- `src/metaprogramming/core.clj`
+- `test/metaprogramming/core_test.clj`
 
 ## Toolchain
 
-- `bun`
-- `node`
+- `clojure`
+- `clj-kondo`
 - `tagref`
 
 ## Provenance
 
-- Source template: `metats`
-- Imported from: `../metats`
-- Source revision: `efc6c234cea68f0568d0a38cd7661012416d43d7`
+- Source template: `metaclj`
+- Imported from: `../metaclj`
+- Source revision: `1abfdf91e7ebf2b61c5e53703602c4dc42014180`

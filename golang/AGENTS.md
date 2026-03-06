@@ -1,4 +1,4 @@
-# Python scaffold agent guide
+# Golang scaffold agent guide
 
 This scaffold follows the shared Make contract: `help`, `doctor`, `init`, `check`, `format`, `test`, `build`.
 
@@ -11,6 +11,6 @@ This scaffold follows the shared Make contract: `help`, `doctor`, `init`, `check
 
 ## Language-specific guidance
 
-- Use `uv run` for project-local tooling instead of relying on global installs.
-- Keep application code inside `src/python_scaffold/`.
-- Classify tests with pytest markers so unit, integration, and LLM suites stay separable.
+- Keep command entrypoints under `cmd/` and reusable logic under `internal/`.
+- Use `gofumpt` plus `gofmt` for formatting and `golangci-lint` for static analysis.
+- Prefer `gotestsum` for readable CI output.

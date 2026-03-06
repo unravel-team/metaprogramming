@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "python-scaffold"
+version = "0.1.0"
+description = "Repeatable Python starter scaffold"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "bandit",
+  "basedpyright",
+  "pytest",
+  "pytest-asyncio",
+  "ruff",
+  "ty"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/python_scaffold"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+  "unit: fast unit tests",
+  "integration: tests that require external infrastructure",
+  "llm: tests that exercise LLM-facing behavior"
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "B", "SIM", "I"]
+ignore = ["E501"]
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+reportAny = false
+reportExplicitAny = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownLambdaType = false

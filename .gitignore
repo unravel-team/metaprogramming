@@ -1,0 +1,17 @@
+# Repository automation caches
+__pycache__/
+
+# Per-scaffold generated artifacts
+**/.venv/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.basedpyright/
+**/.mypy_cache/
+**/.clj-kondo/.cache/
+**/node_modules/
+**/dist/
+**/coverage/
+**/target/
+**/bin/
+**/tmp/
+**/.env

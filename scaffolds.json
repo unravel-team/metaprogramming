@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "commonTargets": [
+    {
+      "name": "help",
+      "description": "List the supported scaffold commands"
+    },
+    {
+      "name": "doctor",
+      "description": "Verify toolchain prerequisites and platform assumptions"
+    },
+    {
+      "name": "init",
+      "description": "Bootstrap local dependencies and one-time project setup"
+    },
+    {
+      "name": "check",
+      "description": "Run static analysis, linting, typing, and documentation validation"
+    },
+    {
+      "name": "format",
+      "description": "Apply the canonical formatter for the language"
+    },
+    {
+      "name": "test",
+      "description": "Run the default automated test suite"
+    },
+    {
+      "name": "build",
+      "description": "Produce the default build artifact"
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "displayName": "TypeScript",
+      "path": "typescript",
+      "summary": "A Bun-powered TypeScript starter with Biome, Vitest, and tagref checks.",
+      "toolchain": [
+        "bun",
+        "node",
+        "tagref"
+      ],
+      "sourceTemplate": {
+        "name": "metats",
+        "localPath": "../metats",
+        "revision": "efc6c234cea68f0568d0a38cd7661012416d43d7"
+      },
+      "supportFiles": [
+        "AGENTS.md",
+        "README.md",
+        ".aider.conf.yml",
+        ".gitignore",
+        "biome.json",
+        "bun.lock",
+        "package.json",
+        "tsconfig.json",
+        "dev_tools/hooks/pre-push",
+        "dev_tools/configuration/direnv.toml"
+      ],
+      "sampleFiles": [
+        "src/index.ts",
+        "tests/smoke.test.ts"
+      ],
+      "agentHighlights": [
+        "Prefer Bun over npm or yarn inside this scaffold.",
+        "Use Biome for both linting and formatting.",
+        "Keep library code in `src/` and tests in `tests/`."
+      ]
+    },
+    "python": {
+      "displayName": "Python",
+      "path": "python",
+      "summary": "A uv-managed Python starter with Ruff, Pytest, BasedPyright, Bandit, and tagref.",
+      "toolchain": [
+        "python3",
+        "uv",
+        "tagref"
+      ],
+      "sourceTemplate": {
+        "name": "metapy",
+        "localPath": "../metapy",
+        "revision": "52366e8cc9205ee2a7ac674c3ff77c8b03dfa8a0"
+      },
+      "supportFiles": [
+        "AGENTS.md",
+        "README.md",
+        ".aider.conf.yml",
+        ".bandit.yml",
+        ".env.sample",
+        ".gitignore",
+        "pyproject.toml",
+        "uv.lock",
+        "dev_tools/hooks/pre-push",
+        "dev_tools/configuration/direnv.toml"
+      ],
+      "sampleFiles": [
+        "src/python_scaffold/core.py",
+        "tests/test_core.py"
+      ],
+      "agentHighlights": [
+        "Use `uv run` for project-local tooling instead of relying on global installs.",
+        "Keep application code inside `src/python_scaffold/`.",
+        "Classify tests with pytest markers so unit, integration, and LLM suites stay separable."
+      ]
+    },
+    "clojure": {
+      "displayName": "Clojure",
+      "path": "clojure",
+      "summary": "A minimal Clojure starter with tools.build, test-runner, zprint via alias, clj-kondo, and tagref.",
+      "toolchain": [
+        "clojure",
+        "clj-kondo",
+        "tagref"
+      ],
+      "sourceTemplate": {
+        "name": "metaclj",
+        "localPath": "../metaclj",
+        "revision": "1abfdf91e7ebf2b61c5e53703602c4dc42014180"
+      },
+      "supportFiles": [
+        "AGENTS.md",
+        "README.md",
+        ".aider.conf.yml",
+        ".gitignore",
+        ".zprint.edn",
+        ".dir-locals.el",
+        "deps.edn",
+        "build.clj",
+        "dev_tools/hooks/pre-push",
+        "dev_tools/configuration/direnv.toml"
+      ],
+      "sampleFiles": [
+        "src/metaprogramming/core.clj",
+        "test/metaprogramming/core_test.clj"
+      ],
+      "agentHighlights": [
+        "Use the `:zprint` alias instead of a platform-global formatter binary.",
+        "Keep namespaces mirrored between `src/` and `test/`.",
+        "Run `clj-kondo` and `zprint` before reaching for heavier tooling."
+      ]
+    },
+    "golang": {
+      "displayName": "Golang",
+      "path": "golang",
+      "summary": "A Go starter with gofumpt, golangci-lint, gotestsum, air, and tagref.",
+      "toolchain": [
+        "go",
+        "gofumpt",
+        "golangci-lint",
+        "gotestsum",
+        "tagref"
+      ],
+      "sourceTemplate": {
+        "name": "metago",
+        "localPath": "../metago",
+        "revision": "ef102b1d347701bb08b1b86a237b31c801aabd63"
+      },
+      "supportFiles": [
+        "AGENTS.md",
+        "README.md",
+        ".aider.conf.yml",
+        ".air.toml",
+        ".env.sample",
+        ".gitignore",
+        ".golangci.yml",
+        "go.mod",
+        "dev_tools/hooks/pre-push",
+        "dev_tools/configuration/direnv.toml"
+      ],
+      "sampleFiles": [
+        "cmd/golang/main.go",
+        "internal/mathx/mathx.go",
+        "internal/mathx/mathx_test.go"
+      ],
+      "agentHighlights": [
+        "Keep command entrypoints under `cmd/` and reusable logic under `internal/`.",
+        "Use `gofumpt` plus `gofmt` for formatting and `golangci-lint` for static analysis.",
+        "Prefer `gotestsum` for readable CI output."
+      ]
+    }
+  }
+}
