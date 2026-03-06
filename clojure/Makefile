@@ -1,5 +1,3 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
 CLOJURE_SOURCES := $(shell find src test -type f \( -name '*.clj' -o -name '*.cljc' -o -name '*.cljs' \) 2>/dev/null) build.clj
 ZPRINT := clojure -M:zprint
 

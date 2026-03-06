@@ -1,5 +1,3 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
 PROJECT_PACKAGE := python_scaffold
 
 SHELL = /bin/bash -Eeuo pipefail

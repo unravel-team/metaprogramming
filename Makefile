@@ -1,3 +1,4 @@
+PYTHON ?= python3
 SHELL = /bin/bash -Eeuo pipefail
 .DEFAULT_GOAL := help
 
@@ -11,19 +12,19 @@ help: ## Show repository automation commands
 
 .PHONY: format
 format: ## Regenerate canonical scaffold docs
-	python3 scripts/render_scaffold_docs.py
+	$(PYTHON) scripts/render_scaffold_docs.py
 
 .PHONY: check
 check: ## Validate scaffold metadata and contracts
-	python3 scripts/check_scaffolds.py
+	$(PYTHON) scripts/check_scaffolds.py
 
 .PHONY: test
 test: ## Run repository tests
-	python3 -m unittest discover -s tests -p 'test_*.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'
 
 .PHONY: smoke
 smoke: ## Run end-to-end smoke checks for every scaffold
-	python3 scripts/smoke_scaffolds.py
+	$(PYTHON) scripts/smoke_scaffolds.py
 
 .PHONY: clean
 clean: ## Remove Python cache directories used by repo automation

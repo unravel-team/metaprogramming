@@ -33,7 +33,6 @@
   "languages": {
     "typescript": {
       "displayName": "TypeScript",
-      "path": "typescript",
       "summary": "A Bun-powered TypeScript starter with Biome, Vitest, and tagref checks.",
       "toolchain": [
         "bun",
@@ -69,7 +68,6 @@
     },
     "python": {
       "displayName": "Python",
-      "path": "python",
       "summary": "A uv-managed Python starter with Ruff, Pytest, BasedPyright, Bandit, and tagref.",
       "toolchain": [
         "python3",
@@ -105,7 +103,6 @@
     },
     "clojure": {
       "displayName": "Clojure",
-      "path": "clojure",
       "summary": "A minimal Clojure starter with tools.build, test-runner, zprint via alias, clj-kondo, and tagref.",
       "toolchain": [
         "clojure",
@@ -141,7 +138,6 @@
     },
     "golang": {
       "displayName": "Golang",
-      "path": "golang",
       "summary": "A Go starter with gofumpt, golangci-lint, gotestsum, air, and tagref.",
       "toolchain": [
         "go",

@@ -10,15 +10,24 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
-from scaffold_tools import ROOT, common_target_names, language_names, load_manifest, run_make_help
+from scaffold_tools import (
+    ROOT,
+    common_target_names,
+    iter_scaffolds,
+    language_names,
+    load_manifest,
+    stale_paths,
+    run_make_help,
+)
 
 
 def render_command_block(help_output: str) -> str:
-    return "```text\n" + help_output.strip() + "\n```\n"
+    return f"```text\n{help_output.strip()}\n```\n"
 
 
-def render_root_readme(manifest: dict) -> str:
+def render_root_readme(manifest: dict[str, Any]) -> str:
     lines = [
         "# Metaprogramming scaffolds",
         "",
@@ -29,18 +38,15 @@ def render_root_readme(manifest: dict) -> str:
         "Every scaffold exposes the same outer Make contract:",
         "",
     ]
-    for target in manifest["commonTargets"]:
-        lines.append(f"- `make {target['name']}` — {target['description']}")
     lines.extend(
-        [
-            "",
-            "## Included scaffolds",
-            "",
-        ]
+        f"- `make {target['name']}` — {target['description']}"
+        for target in manifest["commonTargets"]
     )
-    for language in language_names(manifest):
-        metadata = manifest["languages"][language]
-        lines.append(f"- [`{metadata['displayName']}`](./{metadata['path']}/README.md) — {metadata['summary']}")
+    lines.extend(["", "## Included scaffolds", ""])
+    lines.extend(
+        f"- [`{metadata['displayName']}`](./{language}/README.md) — {metadata['summary']}"
+        for language, metadata, _ in iter_scaffolds(manifest)
+    )
     lines.extend(
         [
             "",
@@ -60,7 +66,7 @@ def render_root_readme(manifest: dict) -> str:
     return "\n".join(lines)
 
 
-def render_root_agents(manifest: dict) -> str:
+def render_root_agents(manifest: dict[str, Any]) -> str:
     lines = [
         "# Agent playbook",
         "",
@@ -86,13 +92,12 @@ def render_root_agents(manifest: dict) -> str:
     for language in language_names(manifest):
         metadata = manifest["languages"][language]
         lines.append(f"### {metadata['displayName']}")
-        for bullet in metadata["agentHighlights"]:
-            lines.append(f"- {bullet}")
+        lines.extend(f"- {bullet}" for bullet in metadata["agentHighlights"])
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_language_readme(metadata: dict, help_output: str) -> str:
+def render_language_readme(metadata: dict[str, Any], help_output: str) -> str:
     lines = [
         f"# {metadata['displayName']} scaffold",
         "",
@@ -112,11 +117,9 @@ def render_language_readme(metadata: dict, help_output: str) -> str:
         "",
         "Support files:",
     ]
-    for rel_path in metadata["supportFiles"]:
-        lines.append(f"- `{rel_path}`")
+    lines.extend(f"- `{rel_path}`" for rel_path in metadata["supportFiles"])
     lines.extend(["", "Starter code:"])
-    for rel_path in metadata["sampleFiles"]:
-        lines.append(f"- `{rel_path}`")
+    lines.extend(f"- `{rel_path}`" for rel_path in metadata["sampleFiles"])
     lines.extend(
         [
             "",
@@ -135,7 +138,9 @@ def render_language_readme(metadata: dict, help_output: str) -> str:
     return "\n".join(lines)
 
 
-def render_language_agents(metadata: dict, common_targets: tuple[str, ...]) -> str:
+def render_language_agents(
+    metadata: dict[str, Any], common_targets: tuple[str, ...]
+) -> str:
     lines = [
         f"# {metadata['displayName']} scaffold agent guide",
         "",
@@ -151,26 +156,18 @@ def render_language_agents(metadata: dict, common_targets: tuple[str, ...]) -> s
         "## Language-specific guidance",
         "",
     ]
-    for bullet in metadata["agentHighlights"]:
-        lines.append(f"- {bullet}")
+    lines.extend(f"- {bullet}" for bullet in metadata["agentHighlights"])
     lines.append("")
     return "\n".join(lines)
 
 
-DOC_RENDERERS = {
-    ROOT / "README.md": render_root_readme,
-    ROOT / "AGENTS.md": render_root_agents,
-}
-
-
-def expected_documents(manifest: dict) -> dict[Path, str]:
-    docs: dict[Path, str] = {}
+def expected_documents(manifest: dict[str, Any]) -> dict[Path, str]:
     common_targets = common_target_names(manifest)
-    for path, renderer in DOC_RENDERERS.items():
-        docs[path] = renderer(manifest)
-    for language in language_names(manifest):
-        metadata = manifest["languages"][language]
-        base = ROOT / metadata["path"]
+    docs: dict[Path, str] = {
+        ROOT / "README.md": render_root_readme(manifest),
+        ROOT / "AGENTS.md": render_root_agents(manifest),
+    }
+    for _, metadata, base in iter_scaffolds(manifest):
         help_output = run_make_help(base)
         docs[base / "README.md"] = render_language_readme(metadata, help_output)
         docs[base / "AGENTS.md"] = render_language_agents(metadata, common_targets)
@@ -186,11 +183,7 @@ def main() -> int:
     docs = expected_documents(manifest)
 
     if args.check:
-        stale: list[str] = []
-        for path, content in docs.items():
-            current = path.read_text() if path.exists() else None
-            if current != content:
-                stale.append(str(path.relative_to(ROOT)))
+        stale = stale_paths(docs)
         if stale:
             print("Generated docs are stale:", file=sys.stderr)
             for path in stale:

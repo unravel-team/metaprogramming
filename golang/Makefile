@@ -1,6 +1,4 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
-GO_BIN := $(shell go env GOPATH)/bin
+GO_BIN ?= $(HOME)/go/bin
 PATH := $(GO_BIN):$(PATH)
 MAIN_PACKAGE := ./cmd/golang
 BUILD_OUTPUT := ./bin/golang

@@ -1,6 +1,3 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
-
 SHELL = /bin/bash -Eeuo pipefail
 .DEFAULT_GOAL := help
 
