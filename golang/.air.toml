@@ -1,0 +1,9 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "make build-air"
+  bin = "./tmp/main"
+  full_bin = "ENV=dev ./tmp/main"
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  exclude_dir = ["tmp", "vendor", "bin"]

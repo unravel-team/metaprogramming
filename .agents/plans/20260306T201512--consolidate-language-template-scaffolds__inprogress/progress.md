@@ -7,3 +7,5 @@
 - 2026-03-06 20:23 IST: Ran `make test`, `make check`, and `make format` in `python/`; `test` and `check` failed because the scaffold has not yet been bootstrapped with a `pyproject.toml` and dev tools, while `format` completed without modifying scaffold contents.
 - 2026-03-06 20:24 IST: Copied the Clojure scaffold into `clojure/` and verified parity with `diff`.
 - 2026-03-06 20:25 IST: Ran `make test`, `make check`, and `make format` in `clojure/`; `test` failed on the bare scaffold, `check` passed with empty source globs, and `format` failed because `zprint` resolved to the macOS system tool rather than the Clojure formatter.
+- 2026-03-06 20:26 IST: Copied the Go scaffold into `golang/` and verified parity with `diff`.
+- 2026-03-06 20:26 IST: Ran `make test`, `make check`, and `make format` in `golang/`; all three failed because the required Go tooling (`gotestsum`, `golangci-lint`, `gofumpt`) is not installed in this environment.

@@ -1,0 +1,6 @@
+.aider*
+.env
+/bin/
+/tmp/
+/vendor/
+*.exe
