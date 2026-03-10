@@ -23,9 +23,7 @@ doctor: ## Verify toolchain prerequisites
 	@echo "Clojure scaffold ready."
 
 .PHONY: init
-init: install ## Bootstrap dependencies and setup
-
-install: install-kondo-configs install-zprint-config install-gitignore CONVENTIONS.md .aider.conf.yml    ## Install all the configuration we need for other targets
+init: install-kondo-configs install-zprint-config install-gitignore install-hooks CONVENTIONS.md .aider.conf.yml    ## Bootstrap dependencies and setup
 
 .clj-kondo:
 	mkdir .clj-kondo

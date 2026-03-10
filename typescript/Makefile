@@ -25,7 +25,7 @@ doctor: ## Verify toolchain prerequisites
 	@echo "TypeScript scaffold ready."
 
 .PHONY: init
-init: install ## Bootstrap dependencies and setup
+init: install-sveltekit install-vitest install-biome install-svelte-check install-hooks .gitignore    ## Bootstrap dependencies and setup
 
 .PHONY: ci
 ci:
@@ -72,9 +72,6 @@ install-svelte-check: package.json
 
 .gitignore:
 	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metats][metats]] project"
-
-.PHONY: install-dev-tools
-install-dev-tools: install-sveltekit install-vitest install-biome install-svelte-check .gitignore    ## Install all development tools (SvelteKit, Vitest, Biome, svelte-check)
 
 .PHONY: upgrade-libs
 upgrade-libs:    ## Upgrade all dependencies to their latest versions
