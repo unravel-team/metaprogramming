@@ -23,7 +23,7 @@ doctor: ## Verify toolchain prerequisites
 	@echo "Clojure scaffold ready."
 
 .PHONY: init
-init: install-kondo-configs install-zprint-config install-gitignore install-hooks CONVENTIONS.md .aider.conf.yml    ## Bootstrap dependencies and setup
+init: install-kondo-configs install-zprint-config install-gitignore install-hooks install-migratus CONVENTIONS.md .aider.conf.yml    ## Bootstrap dependencies and setup
 
 .clj-kondo:
 	mkdir .clj-kondo
@@ -169,6 +169,13 @@ EOF
 .PHONY: install-hooks
 install-hooks: .git/hooks/pre-push
 
+.PHONY: install-migratus
+install-migratus:
+	@if ! grep -q "migratus" deps.edn; then \
+		echo "Adding migratus to deps.edn..."; \
+		clojure -Sdeps '{:deps {migratus/migratus {:mvn/version "1.6.5"}}}' -M -e '(println "Migratus dependency added")'; \
+	fi
+
 CONVENTIONS.md:
 	@echo "Download the CONVENTIONS.md file from the [[https://github.com/unravel-team/metaclj][metaclj]] project"
 
@@ -267,6 +274,30 @@ install-antq:
 .PHONY: upgrade-libs
 upgrade-libs: .antqtool.lastupdated install-antq    ## Install all the deps to their latest versions
 	clojure -Tantq outdated :check-clojure-tools true :upgrade true
+
+.PHONY: infra-build
+infra-build:   ## Build all the local infra (docker-compose)
+	docker compose build
+
+.PHONY: infra-up
+infra-up:   ## Bring up all the local infra (docker-compose)
+	docker compose up
+
+.PHONY: infra-down
+infra-down:       ## Bring down all the local infra (docker-compose)
+	docker compose down
+
+.PHONY: infra-logs
+infra-logs:      ## Show all the logs (docker-compose)
+	docker compose logs
+
+.PHONY: migrate
+migrate: install-migratus    ## Run database migrations (using Migratus)
+	@echo "Run Migratus migrations here (requires migratus configuration)"
+
+.PHONY: migrate-create
+migrate-create: install-migratus    ## Create a new database migration
+	@echo "Create Migratus migration here (requires migratus configuration)"
 
 .PHONY: build
 build: check    ## Build the deployment artifact

@@ -256,21 +256,30 @@ build: check     ## Build the deployment artifact
 docker-build:   ## Build the FastAPI server Dockerfile
 	docker build -f Dockerfile -t metapy:latest -t metapy:$$(git rev-parse --short HEAD) .
 
-.PHONY: docker-compose-build
-docker-compose-build:  ## Build all the local infra (docker-compose)
+.PHONY: infra-build
+infra-build:  ## Build all the local infra (docker-compose)
 	docker compose build
 
-.PHONY: up
-up:   ## Bring up all the local infra (docker-compose) and synthetic data
+.PHONY: infra-up
+infra-up:   ## Bring up all the local infra (docker-compose) and synthetic data
 	docker compose up
 
-.PHONY: logs
-logs:
+.PHONY: infra-down
+infra-down:       ## Bring down all the local infra (docker-compose)
+	docker compose down
+
+.PHONY: infra-logs
+infra-logs:
 	docker compose logs
 
 .PHONY: down
-down:       ## Bring down all the local infra (docker-compose)
-	docker compose down
+down: infra-down       ## Alias for infra-down (deprecated)
+
+.PHONY: up
+up: infra-up   ## Alias for infra-up (deprecated)
+
+.PHONY: logs
+logs: infra-logs      ## Alias for infra-logs (deprecated)
 
 .PHONY: down-clean
 down-clean:  ## Bring down all the local infra and delete volumes
@@ -284,7 +293,7 @@ down-clean:  ## Bring down all the local infra and delete volumes
 	fi
 
 .PHONY: migrate
-migrate:    ## Run Alembic database migrations
+migrate:    ## Run database migrations (using Alembic)
 	uv run python -m alembic upgrade head
 
 .PHONY: server

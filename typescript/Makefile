@@ -19,13 +19,13 @@ help:    ## A brief listing of all available commands
 
 .PHONY: doctor
 doctor: ## Verify toolchain prerequisites
-	@for cmd in bun node tagref; do \
+	@for cmd in bun node tagref dbmate; do \
 		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
 	done
 	@echo "TypeScript scaffold ready."
 
 .PHONY: init
-init: install-sveltekit install-vitest install-biome install-svelte-check install-hooks .gitignore    ## Bootstrap dependencies and setup
+init: install-sveltekit install-vitest install-biome install-svelte-check install-dbmate install-hooks .gitignore    ## Bootstrap dependencies and setup
 
 .PHONY: ci
 ci:
@@ -69,6 +69,17 @@ install-vitest: package.json
 .PHONY: install-svelte-check
 install-svelte-check: package.json
 	bun install --save-dev svelte-check typescript
+
+.PHONY: install-dbmate
+install-dbmate:
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install dbmate; \
+	elif command -v curl >/dev/null 2>&1; then \
+		curl -fsSL https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64.tar.gz | tar -xz && sudo mv dbmate /usr/local/bin/; \
+	else \
+		echo "Please install dbmate manually from https://github.com/amacneil/dbmate"; \
+		exit 1; \
+	fi
 
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
@@ -192,21 +203,43 @@ build: check    ## Build the SvelteKit application for production
 preview:    ## Preview the production build locally
 	bun run preview
 
-.PHONY: docker-compose-build
-docker-compose-build:   ## Build all the local infra (docker-compose)
+.PHONY: infra-build
+infra-build:   ## Build all the local infra (docker-compose)
 	docker compose build
 
-.PHONY: up
-up:     ## Bring up all the local infra (docker-compose)
+.PHONY: infra-up
+infra-up:     ## Bring up all the local infra (docker-compose)
 	docker compose up
 
+.PHONY: infra-down
+infra-down:       ## Bring down all the local infra (docker-compose)
+	docker compose down
+
+.PHONY: infra-logs
+infra-logs:      ## Show all the logs (docker-compose)
+	docker compose logs
+
 .PHONY: down
-down:       ## Bring down all the local infra (docker-compose)
-	docker compose down -v
+down: infra-down       ## Alias for infra-down (deprecated)
+
+.PHONY: up
+up: infra-up     ## Alias for infra-up (deprecated)
 
 .PHONY: logs
-logs:      ## Show all the logs (docker-compose)
-	docker compose logs
+logs: infra-logs      ## Alias for infra-logs (deprecated)
+
+.PHONY: migrate
+migrate: install-dbmate    ## Run database migrations (using dbmate)
+	dbmate up
+
+.PHONY: migrate-create
+migrate-create: install-dbmate    ## Create a new database migration
+	@read -p "Enter migration name: " name; \
+	dbmate new $$name
+
+.PHONY: migrate-rollback
+migrate-rollback: install-dbmate    ## Rollback the last database migration
+	dbmate rollback
 
 .PHONY: deploy
 deploy: build    ## Deploy the current code to production

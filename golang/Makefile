@@ -17,7 +17,7 @@ help:    ## A brief listing of all available commands
 
 .PHONY: doctor
 doctor: ## Verify toolchain prerequisites
-	@for cmd in go gofumpt golangci-lint gotestsum tagref; do \
+	@for cmd in go gofumpt golangci-lint gotestsum tagref goose; do \
 		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
 	done
 	@echo "Go scaffold ready."
@@ -68,6 +68,10 @@ install-tagref:
 		echo "tagref executable not found. Please install it from https://github.com/stepchowfun/tagref?tab=readme-ov-file#installation-instructions"; \
 		exit 1; \
 	fi
+
+.PHONY: install-goose
+install-goose:
+	go install github.com/pressly/goose/v3/cmd/goose@latest
 
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
@@ -126,7 +130,7 @@ CONVENTIONS.md:
 	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metago][metago]] project"
 
 .PHONY: install-dev-tools
-install-dev-tools: install-air install-gofumpt install-golangci-lint install-gopls install-gotestsum install-tagref install-hooks CONVENTIONS.md .aider.conf.yml .gitignore    ## Install all development tools
+install-dev-tools: install-air install-gofumpt install-golangci-lint install-gopls install-gotestsum install-tagref install-goose install-hooks CONVENTIONS.md .aider.conf.yml .gitignore    ## Install all development tools
 
 .PHONY: check-lint
 check-lint:
@@ -173,6 +177,31 @@ test-integration:    ## Run integration tests
 
 .PHONY: test
 test: test-unit   ## Run unit tests (alias for test-unit)
+
+.PHONY: infra-build
+infra-build:   ## Build all the local infra (docker-compose)
+	docker compose build
+
+.PHONY: infra-up
+infra-up:   ## Bring up all the local infra (docker-compose)
+	docker compose up
+
+.PHONY: infra-down
+infra-down:       ## Bring down all the local infra (docker-compose)
+	docker compose down
+
+.PHONY: infra-logs
+infra-logs:      ## Show all the logs (docker-compose)
+	docker compose logs
+
+.PHONY: migrate
+migrate: install-goose    ## Run database migrations (using Goose)
+	goose -dir migrations postgres "user=postgres password=postgres dbname=metago host=localhost sslmode=disable" up
+
+.PHONY: migrate-create
+migrate-create: install-goose    ## Create a new database migration
+	@read -p "Enter migration name: " name; \
+	goose -dir migrations create $$name sql
 
 .PHONY: upgrade-libs
 upgrade-libs:  ## Install all the deps to their latest versions
