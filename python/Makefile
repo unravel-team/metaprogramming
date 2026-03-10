@@ -233,8 +233,8 @@ format:  ## Format the code using ruff
 megalinter:
 	docker run --rm -v "$(HERE):/tmp/lint" oxsecurity/megalinter:v8
 
-.PHONY: test
-test:    ## Run only the unit tests
+.PHONY: test-unit
+test-unit:    ## Run only the unit tests
 	uv run pytest -m "unit"
 
 .PHONY: test-llm
@@ -244,6 +244,9 @@ test-llm:    ## Run only the llm tests
 .PHONY: test-integration
 test-integration:    ## Run only the integration tests
 	uv run pytest -m "integration"
+
+.PHONY: test
+test: test-unit    ## Run unit tests (alias for test-unit)
 
 .PHONY: build
 build: check     ## Build the deployment artifact

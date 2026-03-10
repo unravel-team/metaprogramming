@@ -224,11 +224,23 @@ check: check-tagref check-cljkondo check-zprint    ## Check that the code is wel
 format:       ## Format the code to conform with our standards
 	zprint -lfw $(CLOJURE_SOURCES)
 
+.PHONY: test-unit
+test-unit:    ## Run unit tests
+	clojure -T:build test
+
+.PHONY: test-llm
+test-llm:    ## Run LLM-specific tests
+	@echo "Run LLM tests here (add appropriate test selector)"
+
+.PHONY: test-integration
+test-integration:    ## Run integration tests
+	@echo "Run integration tests here (add appropriate test selector)"
+
 .PHONY: test-all
 test-all:
 	clojure -M:poly test :all
 
-.PHONY: test-converage
+.PHONY: test-coverage
 test-coverage:  ## Run coverage reports for the code using Clofidence
 	clojure -X:dev:test:clofidence
 
@@ -237,8 +249,7 @@ test-poly:    ## Run Poly tests for the code
 	clojure -M:poly test
 
 .PHONY: test
-test:    ## Run all the tests for the code
-	clojure -T:build test
+test: test-unit    ## Run unit tests (alias for test-unit)
 
 .PHONY: install-antq
 install-antq:

@@ -159,9 +159,20 @@ format:     ## Format the code using gofumpt
 	gofumpt -w .
 	gofmt -w .
 
+.PHONY: test-unit
+test-unit:   ## Run unit tests
+	gotestsum --format testname -run "TestUnit|[^I]Test" -skip "Integration|LLM"
+
+.PHONY: test-llm
+test-llm:    ## Run LLM-specific tests
+	gotestsum --format testname -run "TestLLM"
+
+.PHONY: test-integration
+test-integration:    ## Run integration tests
+	gotestsum --format testname -run "TestIntegration"
+
 .PHONY: test
-test:   ## Run the unit tests for the code
-	gotestsum --format testname
+test: test-unit   ## Run unit tests (alias for test-unit)
 
 .PHONY: upgrade-libs
 upgrade-libs:  ## Install all the deps to their latest versions

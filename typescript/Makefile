@@ -157,9 +157,20 @@ format:    ## Format code with Biome
 		echo "No $(BIOME_SCOPE) directory found; skipping Biome format"; \
 	fi
 
+.PHONY: test-unit
+test-unit:    ## Run unit tests
+	bun test --config vitest.config.unit.ts
+
+.PHONY: test-llm
+test-llm:    ## Run LLM-specific tests
+	bun test --config vitest.config.llm.ts
+
+.PHONY: test-integration
+test-integration:    ## Run integration tests
+	bun test --config vitest.config.integration.ts
+
 .PHONY: test
-test:    ## Run all the tests for the code
-	bun test
+test: test-unit    ## Run unit tests (alias for test-unit)
 
 .PHONY: test-watch
 test-watch:    ## Run tests in watch mode
