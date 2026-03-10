@@ -70,6 +70,54 @@ install-vitest: package.json
 install-svelte-check: package.json
 	bun install --save-dev svelte-check typescript
 
+.git/hooks/pre-push:
+	@echo "Setting up Git hooks..."
+	@cat > .git/hooks/pre-push << 'EOF'
+#!/bin/sh
+
+# Redirect output to stderr for visibility
+exec 1>&2
+
+echo "Running pre-push checks..."
+
+echo "Running make check (lints/static analysis)"
+
+if ! make check; then
+	echo "❌ make check failed. Aborting push."
+	echo "   Fix the issues and try again."
+	exit 1
+fi
+
+echo "Running make format (auto-formatting)"
+if ! make format; then
+	echo "❌ make format failed. Aborting push."
+	exit 1
+fi
+
+echo "Checking for uncommitted changes after formatting"
+if ! git diff --exit-code --quiet; then
+	echo "⚠️  Code was reformatted by 'make format'!"
+	echo "   Please commit these changes before pushing."
+	exit 1
+fi
+
+echo "Running make test (unit tests)"
+if ! make test; then
+	echo "❌ make test failed. Aborting push."
+	echo "   Fix the test failures and try again."
+	exit 1
+fi
+
+echo "✅ All checks passed. Pushing changes..."
+exit 0
+EOF
+	@chmod +x .git/hooks/pre-push
+	@echo "✅ Git hooks installed successfully!"
+	@echo "The pre-push hook will run make check, make format, and make test before each push."
+
+.PHONY: install-hooks
+install-hooks: .git/hooks/pre-push
+
 .gitignore:
 	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metats][metats]] project"
 

@@ -7,21 +7,22 @@
 * Quickstart
 
 1. Copy language folder (clojure, golang, python, or typescript) to your project
-2. Copy =dev_tools= folder (optional, for git hooks)
-3. =make doctor= -- verify toolchain
-4. =make init= -- bootstrap dependencies
+2. =make doctor= -- verify toolchain
+3. =make init= -- bootstrap dependencies
+4. =make install-hooks= -- set up git hooks (optional)
 
 * Common Make Targets
 
-| Target   | Purpose                 |
-|----------+-------------------------|
-| =help=   | Show available commands |
-| =doctor= | Verify required tools   |
-| =init=   | Bootstrap setup         |
-| =check=  | Run static analysis     |
-| =format= | Apply formatting        |
-| =test=   | Run tests               |
-| =build=  | Create artifact         |
+| Target          | Purpose                              |
+|-----------------+--------------------------------------|
+| =help=          | Show available commands              |
+| =doctor=        | Verify required tools                |
+| =init=          | Bootstrap setup                      |
+| =install-hooks= | Set up git pre-push hook (optional)  |
+| =check=         | Run static analysis                  |
+| =format=        | Apply formatting                     |
+| =test=          | Run tests                            |
+| =build=         | Create artifact                      |
 
 * Language-Specific Conventions
 
