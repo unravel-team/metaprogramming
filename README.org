@@ -8,8 +8,7 @@
 
 1. Copy language folder (clojure, golang, python, or typescript) to your project
 2. =make doctor= -- verify toolchain
-3. =make init= -- bootstrap dependencies
-4. =make install-hooks= -- set up git hooks (optional)
+3. =make init= -- bootstrap dependencies (includes git hooks)
 
 * Common Make Targets
 
