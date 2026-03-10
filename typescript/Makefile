@@ -19,13 +19,13 @@ help:    ## A brief listing of all available commands
 
 .PHONY: doctor
 doctor: ## Verify toolchain prerequisites
-	@for cmd in bun node tagref dbmate; do \
+	@for cmd in bun node tagref dbmate dafny; do \
 		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
 	done
 	@echo "TypeScript scaffold ready."
 
 .PHONY: init
-init: install-sveltekit install-vitest install-biome install-svelte-check install-dbmate install-hooks .gitignore    ## Bootstrap dependencies and setup
+init: install-sveltekit install-vitest install-biome install-svelte-check install-dbmate install-dafny install-hooks .gitignore    ## Bootstrap dependencies and setup
 
 .PHONY: ci
 ci:
@@ -78,6 +78,18 @@ install-dbmate:
 		curl -fsSL https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64.tar.gz | tar -xz && sudo mv dbmate /usr/local/bin/; \
 	else \
 		echo "Please install dbmate manually from https://github.com/amacneil/dbmate"; \
+		exit 1; \
+	fi
+
+.PHONY: install-dafny
+install-dafny:
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install dafny; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		echo "Installing Dafny via snap..."; \
+		snap install dafny --classic; \
+	else \
+		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
 		exit 1; \
 	fi
 
@@ -156,8 +168,16 @@ check-typescript:
 		bunx tsc --noEmit; \
 	fi
 
+.PHONY: check-dafny
+check-dafny:
+	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+		dafny verify contracts/*.dfy; \
+	else \
+		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
+	fi
+
 .PHONY: check
-check: check-biome check-typescript check-tagref    ## Check that the code is well linted, well typed, well documented
+check: check-biome check-typescript check-tagref check-dafny    ## Check that the code is well linted, well typed, well documented
 	@echo "All checks passed!"
 
 .PHONY: format

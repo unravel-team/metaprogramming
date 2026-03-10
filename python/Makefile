@@ -17,13 +17,13 @@ help:    ## A brief listing of all available commands
 
 .PHONY: doctor
 doctor: ## Verify toolchain prerequisites
-	@for cmd in python3 uv ruff pytest basedpyright bandit tagref; do \
+	@for cmd in python3 uv ruff pytest basedpyright bandit tagref dafny; do \
 		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
 	done
 	@echo "Python scaffold ready."
 
 .PHONY: init
-init: venv install-dev-tools install-hooks ## Bootstrap dependencies and setup
+init: venv install-dev-tools install-dafny install-hooks ## Bootstrap dependencies and setup
 
 .env.sample:
 	touch .env.sample
@@ -137,6 +137,18 @@ install-tagref:
 install-bandit:
 	uv tool install bandit
 
+.PHONY: install-dafny
+install-dafny:
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install dafny; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		echo "Installing Dafny via snap..."; \
+		snap install dafny --classic; \
+	else \
+		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
+		exit 1; \
+	fi
+
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
 	@cat > .git/hooks/pre-push << 'EOF'
@@ -220,8 +232,16 @@ check-ty:
 check-basedpyright:
 	uv run basedpyright src tests
 
+.PHONY: check-dafny
+check-dafny:
+	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+		dafny verify contracts/*.dfy; \
+	else \
+		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
+	fi
+
 .PHONY: check
-check: check-uv check-ruff check-tagref check-ty check-bandit check-basedpyright    ## Check that the code is well linted, well typed, well documented. Fast checks first, slow later
+check: check-uv check-ruff check-tagref check-ty check-bandit check-basedpyright check-dafny    ## Check that the code is well linted, well typed, well documented. Fast checks first, slow later
 	@echo "All checks passed!"
 
 .PHONY: format

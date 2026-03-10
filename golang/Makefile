@@ -17,13 +17,13 @@ help:    ## A brief listing of all available commands
 
 .PHONY: doctor
 doctor: ## Verify toolchain prerequisites
-	@for cmd in go gofumpt golangci-lint gotestsum tagref goose; do \
+	@for cmd in go gofumpt golangci-lint gotestsum tagref goose dafny; do \
 		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
 	done
 	@echo "Go scaffold ready."
 
 .PHONY: init
-init: sync install-dev-tools install-hooks ## Bootstrap dependencies and setup
+init: sync install-dev-tools install-dafny install-hooks ## Bootstrap dependencies and setup
 
 .env: .env.sample
 	@if [ ! -f .env ]; then \
@@ -72,6 +72,18 @@ install-tagref:
 .PHONY: install-goose
 install-goose:
 	go install github.com/pressly/goose/v3/cmd/goose@latest
+
+.PHONY: install-dafny
+install-dafny:
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install dafny; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		echo "Installing Dafny via snap..."; \
+		snap install dafny --classic; \
+	else \
+		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
+		exit 1; \
+	fi
 
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
@@ -140,6 +152,14 @@ check-lint:
 check-tagref: install-tagref
 	tagref
 
+.PHONY: check-dafny
+check-dafny:
+	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+		dafny verify contracts/*.dfy; \
+	else \
+		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
+	fi
+
 .PHONY: build-air
 build-air:
 	go build -o bin/metago ./cmd/metago
@@ -156,7 +176,7 @@ server: build  ## Run the server binary
 	./bin/metago
 
 .PHONY: check
-check: check-lint check-tagref      ## Check that the code is well linted, well typed, well documented
+check: check-lint check-tagref check-dafny      ## Check that the code is well linted, well typed, well documented
 
 .PHONY: format
 format:     ## Format the code using gofumpt

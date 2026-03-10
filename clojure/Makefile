@@ -17,13 +17,13 @@ help:    ## A brief explanation of everything you can do
 
 .PHONY: doctor
 doctor: ## Verify toolchain prerequisites
-	@for cmd in clojure clj-kondo zprint tagref; do \
+	@for cmd in clojure clj-kondo zprint tagref dafny; do \
 		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
 	done
 	@echo "Clojure scaffold ready."
 
 .PHONY: init
-init: install-kondo-configs install-zprint-config install-gitignore install-hooks install-migratus CONVENTIONS.md .aider.conf.yml    ## Bootstrap dependencies and setup
+init: install-kondo-configs install-zprint-config install-gitignore install-hooks install-migratus install-dafny CONVENTIONS.md .aider.conf.yml    ## Bootstrap dependencies and setup
 
 .clj-kondo:
 	mkdir .clj-kondo
@@ -176,6 +176,18 @@ install-migratus:
 		clojure -Sdeps '{:deps {migratus/migratus {:mvn/version "1.6.5"}}}' -M -e '(println "Migratus dependency added")'; \
 	fi
 
+.PHONY: install-dafny
+install-dafny:
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install dafny; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		echo "Installing Dafny via snap..."; \
+		snap install dafny --classic; \
+	else \
+		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
+		exit 1; \
+	fi
+
 CONVENTIONS.md:
 	@echo "Download the CONVENTIONS.md file from the [[https://github.com/unravel-team/metaclj][metaclj]] project"
 
@@ -223,8 +235,16 @@ check-cljkondo:
 check-zprint:
 	zprint -c $(CLOJURE_SOURCES)
 
+.PHONY: check-dafny
+check-dafny:
+	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+		dafny verify contracts/*.dfy; \
+	else \
+		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
+	fi
+
 .PHONY: check
-check: check-tagref check-cljkondo check-zprint    ## Check that the code is well linted
+check: check-tagref check-cljkondo check-zprint check-dafny    ## Check that the code is well linted
 	@echo "All checks passed!"
 
 .PHONY: format
