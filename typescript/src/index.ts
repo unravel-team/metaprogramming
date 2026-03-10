@@ -1,3 +1,7 @@
-export function add(left: number, right: number): number {
-  return left + right;
+/**
+ * Main application module.
+ */
+
+export function example(x: number): number {
+  return x * 2;
 }

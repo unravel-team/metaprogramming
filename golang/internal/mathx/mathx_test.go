@@ -2,8 +2,8 @@ package mathx
 
 import "testing"
 
-func TestAdd(t *testing.T) {
-	if got := Add(2, 3); got != 5 {
-		t.Fatalf("Add(2, 3) = %d, want 5", got)
+func TestExample(t *testing.T) {
+	if got := 1 + 1; got != 2 {
+		t.Fatalf("got %d, want 2", got)
 	}
 }

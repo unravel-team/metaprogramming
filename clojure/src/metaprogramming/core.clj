@@ -1,3 +1,3 @@
 (ns metaprogramming.core)
 
-(defn add [left right] (+ left right))
+(defn example [x] "Example function." (* x 2))
