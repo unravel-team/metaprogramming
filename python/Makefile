@@ -405,9 +405,12 @@ deploy-reuse-image:	.fly_image    ## Deploy only config changes to production, r
 		exit 1; \
 	fi
 
-.PHONY: upgrade-libs
-upgrade-libs:    ## Upgrade all the deps to their latest versions
+.PHONY: upgrade-deps
+upgrade-deps:    ## Upgrade all dependencies to their latest versions
 	uv sync --upgrade
+
+.PHONY: upgrade-libs
+upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: clean-cache
 clean-cache:    ## Clean UV Cache (only needed in extreme conditions)

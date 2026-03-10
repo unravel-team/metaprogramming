@@ -223,10 +223,13 @@ migrate-create: install-goose    ## Create a new database migration
 	@read -p "Enter migration name: " name; \
 	goose -dir migrations create $$name sql
 
-.PHONY: upgrade-libs
-upgrade-libs:  ## Install all the deps to their latest versions
+.PHONY: upgrade-deps
+upgrade-deps:  ## Upgrade all dependencies to their latest versions
 	go get -u ./...
 	go mod tidy
+
+.PHONY: upgrade-libs
+upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: clean
 clean:  ## Clean build artifacts

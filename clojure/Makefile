@@ -291,9 +291,12 @@ install-antq:
 .antqtool.lastupdated:
 	touch .antqtool.lastupdated
 
-.PHONY: upgrade-libs
-upgrade-libs: .antqtool.lastupdated install-antq    ## Install all the deps to their latest versions
+.PHONY: upgrade-deps
+upgrade-deps: .antqtool.lastupdated install-antq    ## Upgrade all dependencies to their latest versions
 	clojure -Tantq outdated :check-clojure-tools true :upgrade true
+
+.PHONY: upgrade-libs
+upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: infra-build
 infra-build:   ## Build all the local infra (docker-compose)

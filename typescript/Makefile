@@ -143,10 +143,13 @@ install-hooks: .git/hooks/pre-push
 .gitignore:
 	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metats][metats]] project"
 
-.PHONY: upgrade-libs
-upgrade-libs:    ## Upgrade all dependencies to their latest versions
+.PHONY: upgrade-deps
+upgrade-deps:    ## Upgrade all dependencies to their latest versions
 	bun update
 	bun audit fix
+
+.PHONY: upgrade-libs
+upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: check-tagref
 check-tagref:
