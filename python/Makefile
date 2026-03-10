@@ -15,6 +15,16 @@ help:    ## A brief listing of all available commands
 		substr($$0, index($$0,"##")+3) \
 	}' $(MAKEFILE_LIST)
 
+.PHONY: doctor
+doctor: ## Verify toolchain prerequisites
+	@for cmd in python3 uv ruff pytest basedpyright bandit tagref; do \
+		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+	done
+	@echo "Python scaffold ready."
+
+.PHONY: init
+init: venv install-dev-tools ## Bootstrap dependencies and setup
+
 .env.sample:
 	touch .env.sample
 

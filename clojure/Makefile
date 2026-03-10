@@ -15,6 +15,16 @@ help:    ## A brief explanation of everything you can do
 		substr($$0, index($$0,"##")+3) \
 	}' $(MAKEFILE_LIST)
 
+.PHONY: doctor
+doctor: ## Verify toolchain prerequisites
+	@for cmd in clojure clj-kondo zprint tagref; do \
+		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+	done
+	@echo "Clojure scaffold ready."
+
+.PHONY: init
+init: install ## Bootstrap dependencies and setup
+
 install: install-kondo-configs install-zprint-config install-gitignore CONVENTIONS.md .aider.conf.yml    ## Install all the configuration we need for other targets
 
 .clj-kondo:

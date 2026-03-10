@@ -15,6 +15,16 @@ help:    ## A brief listing of all available commands
 		substr($$0, index($$0,"##")+3) \
 	}' $(MAKEFILE_LIST)
 
+.PHONY: doctor
+doctor: ## Verify toolchain prerequisites
+	@for cmd in go gofumpt golangci-lint gotestsum tagref; do \
+		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+	done
+	@echo "Go scaffold ready."
+
+.PHONY: init
+init: sync install-dev-tools ## Bootstrap dependencies and setup
+
 .env: .env.sample
 	@if [ ! -f .env ]; then \
 		echo "Creating .env from .env.sample..."; \

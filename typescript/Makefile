@@ -17,6 +17,16 @@ help:    ## A brief listing of all available commands
 		substr($$0, index($$0,"##")+3) \
 	}' $(MAKEFILE_LIST)
 
+.PHONY: doctor
+doctor: ## Verify toolchain prerequisites
+	@for cmd in bun node tagref; do \
+		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+	done
+	@echo "TypeScript scaffold ready."
+
+.PHONY: init
+init: install ## Bootstrap dependencies and setup
+
 .PHONY: ci
 ci:
 	bun ci
