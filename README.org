@@ -10,6 +10,16 @@
 2. =make doctor= -- verify toolchain
 3. =make init= -- bootstrap dependencies (includes git hooks)
 
+* Recommended Tools
+
+Optional tooling configurations that can improve your development experience are available in the [[file:recommended-tools/][recommended-tools/]] folder. These are not required to build or test the project.
+
+Examples include:
+
+- =direnv= -- Automatic environment variable loading when entering project directories
+
+See [[file:recommended-tools/README.md][recommended-tools/README.md]] for details.
+
 * Common Make Targets
 
 | Target   | Purpose                 |

@@ -1,0 +1,60 @@
+#+title:  Recommended Tools
+#+author: Vedang Manerikar
+
+This folder contains optional tooling configurations that we find useful for development. These are not required to build or test the project, but can improve your development experience.
+
+* direnv
+
+[[https://direnv.net/][direnv]] is an extension for your shell that automatically loads environment variables when you =cd= into a directory containing an =.envrc= file.
+
+** Installation
+
+#+begin_src bash
+# macOS (Homebrew)
+brew install direnv
+
+# Linux (various package managers)
+# See https://direnv.net/docs/installation.html
+#+end_src
+
+** Setup
+
+1. Add direnv to your shell's hook:
+   - *bash*: Add =eval "$(direnv hook bash)"= to =~/.bashrc=
+   - *zsh*: Add =eval "$(direnv hook zsh)"= to =~/.zshrc=
+   - *fish*: Add =direnv hook fish | source= to =~/.config/fish/config.fish=
+
+2. Restart your shell or run the hook command manually.
+
+3. In your project directory (if you want to use direnv):
+   #+begin_src bash
+   direnv allow
+   #+end_src
+
+** Configuration
+
+The =direnv.toml= file in this folder provides a useful default:
+
+#+begin_src toml
+[global]
+load_dotenv = true
+#+end_src
+
+This configuration tells direnv to automatically load =.env= files (in addition to =.envrc= files) when you enter a directory.
+
+To use this configuration, copy it to your project root:
+
+#+begin_src bash
+cp recommended-tools/direnv.toml .direnv.toml
+#+end_src
+
+** Benefits
+
+- Automatically loads environment variables when you enter a project directory
+- No need to manually =source .env= files
+- Works seamlessly with the =.env= files that most of our language templates use
+- Prevents environment variable leakage between projects
+
+** Not Required
+
+direnv is completely optional. You can continue to manually source =.env= files or use your preferred method for managing environment variables.
