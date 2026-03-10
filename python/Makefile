@@ -139,15 +139,9 @@ install-bandit:
 
 .PHONY: install-dafny
 install-dafny:
-	@if command -v brew >/dev/null 2>&1; then \
-		brew install dafny; \
-	elif [ "$$(uname)" = "Linux" ]; then \
-		echo "Installing Dafny via snap..."; \
-		snap install dafny --classic; \
-	else \
-		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
-		exit 1; \
-	fi
+	@command -v brew >/dev/null 2>&1 && brew install dafny || \
+	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
+	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
 
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
@@ -234,7 +228,7 @@ check-basedpyright:
 
 .PHONY: check-dafny
 check-dafny:
-	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
 		dafny verify contracts/*.dfy; \
 	else \
 		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
@@ -266,7 +260,7 @@ test-integration:    ## Run only the integration tests
 	uv run pytest -m "integration"
 
 .PHONY: test
-test: test-unit    ## Run unit tests (alias for test-unit)
+test: test-unit    ## Run unit tests
 
 .PHONY: build
 build: check     ## Build the deployment artifact
@@ -292,17 +286,8 @@ infra-down:       ## Bring down all the local infra (docker-compose)
 infra-logs:
 	docker compose logs
 
-.PHONY: down
-down: infra-down       ## Alias for infra-down (deprecated)
-
-.PHONY: up
-up: infra-up   ## Alias for infra-up (deprecated)
-
-.PHONY: logs
-logs: infra-logs      ## Alias for infra-logs (deprecated)
-
-.PHONY: down-clean
-down-clean:  ## Bring down all the local infra and delete volumes
+.PHONY: infra-down-clean
+infra-down-clean:  ## Bring down all the local infra and delete volumes
 	@echo "Warning: Deleting volumes will lead to data loss. You will start from scratch and this may introduce bugs (e.g., if your code does not work with existing data in postgres)."
 	@read -p "Are you sure you want to proceed? (yes/no): " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
@@ -408,9 +393,6 @@ deploy-reuse-image:	.fly_image    ## Deploy only config changes to production, r
 .PHONY: upgrade-deps
 upgrade-deps:    ## Upgrade all dependencies to their latest versions
 	uv sync --upgrade
-
-.PHONY: upgrade-libs
-upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: clean-cache
 clean-cache:    ## Clean UV Cache (only needed in extreme conditions)

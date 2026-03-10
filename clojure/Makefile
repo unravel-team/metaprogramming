@@ -178,15 +178,9 @@ install-migratus:
 
 .PHONY: install-dafny
 install-dafny:
-	@if command -v brew >/dev/null 2>&1; then \
-		brew install dafny; \
-	elif [ "$$(uname)" = "Linux" ]; then \
-		echo "Installing Dafny via snap..."; \
-		snap install dafny --classic; \
-	else \
-		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
-		exit 1; \
-	fi
+	@command -v brew >/dev/null 2>&1 && brew install dafny || \
+	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
+	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
 
 CONVENTIONS.md:
 	@echo "Download the CONVENTIONS.md file from the [[https://github.com/unravel-team/metaclj][metaclj]] project"
@@ -237,7 +231,7 @@ check-zprint:
 
 .PHONY: check-dafny
 check-dafny:
-	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
 		dafny verify contracts/*.dfy; \
 	else \
 		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
@@ -276,7 +270,7 @@ test-poly:    ## Run Poly tests for the code
 	clojure -M:poly test
 
 .PHONY: test
-test: test-unit    ## Run unit tests (alias for test-unit)
+test: test-unit    ## Run unit tests
 
 .PHONY: install-antq
 install-antq:
@@ -294,9 +288,6 @@ install-antq:
 .PHONY: upgrade-deps
 upgrade-deps: .antqtool.lastupdated install-antq    ## Upgrade all dependencies to their latest versions
 	clojure -Tantq outdated :check-clojure-tools true :upgrade true
-
-.PHONY: upgrade-libs
-upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: infra-build
 infra-build:   ## Build all the local infra (docker-compose)

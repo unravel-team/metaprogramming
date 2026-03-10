@@ -28,7 +28,6 @@ The following targets are now standardized across all languages:
 
 ### Dependency Management
 - `upgrade-deps` - Upgrade all dependencies to latest versions
-- `upgrade-libs` - Deprecated alias for upgrade-deps
 
 ## Database Migration Tools
 

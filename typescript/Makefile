@@ -83,15 +83,9 @@ install-dbmate:
 
 .PHONY: install-dafny
 install-dafny:
-	@if command -v brew >/dev/null 2>&1; then \
-		brew install dafny; \
-	elif [ "$$(uname)" = "Linux" ]; then \
-		echo "Installing Dafny via snap..."; \
-		snap install dafny --classic; \
-	else \
-		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
-		exit 1; \
-	fi
+	@command -v brew >/dev/null 2>&1 && brew install dafny || \
+	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
+	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
 
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
@@ -148,9 +142,6 @@ upgrade-deps:    ## Upgrade all dependencies to their latest versions
 	bun update
 	bun audit fix
 
-.PHONY: upgrade-libs
-upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
-
 .PHONY: check-tagref
 check-tagref:
 	@if ! command -v tagref >/dev/null 2>&1; then \
@@ -173,7 +164,7 @@ check-typescript:
 
 .PHONY: check-dafny
 check-dafny:
-	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
 		dafny verify contracts/*.dfy; \
 	else \
 		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
@@ -204,7 +195,7 @@ test-integration:    ## Run integration tests
 	bun test --config vitest.config.integration.ts
 
 .PHONY: test
-test: test-unit    ## Run unit tests (alias for test-unit)
+test: test-unit    ## Run unit tests
 
 .PHONY: test-watch
 test-watch:    ## Run tests in watch mode
@@ -241,15 +232,6 @@ infra-down:       ## Bring down all the local infra (docker-compose)
 .PHONY: infra-logs
 infra-logs:      ## Show all the logs (docker-compose)
 	docker compose logs
-
-.PHONY: down
-down: infra-down       ## Alias for infra-down (deprecated)
-
-.PHONY: up
-up: infra-up     ## Alias for infra-up (deprecated)
-
-.PHONY: logs
-logs: infra-logs      ## Alias for infra-logs (deprecated)
 
 .PHONY: migrate
 migrate: install-dbmate    ## Run database migrations (using dbmate)

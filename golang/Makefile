@@ -75,15 +75,9 @@ install-goose:
 
 .PHONY: install-dafny
 install-dafny:
-	@if command -v brew >/dev/null 2>&1; then \
-		brew install dafny; \
-	elif [ "$$(uname)" = "Linux" ]; then \
-		echo "Installing Dafny via snap..."; \
-		snap install dafny --classic; \
-	else \
-		echo "Please install Dafny manually from https://github.com/dafny-lang/dafny/releases"; \
-		exit 1; \
-	fi
+	@command -v brew >/dev/null 2>&1 && brew install dafny || \
+	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
+	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
 
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
@@ -154,7 +148,7 @@ check-tagref: install-tagref
 
 .PHONY: check-dafny
 check-dafny:
-	@if [ -d "contracts" ] && [ -n "$$(find contracts -name '*.dfy' 2>/dev/null)" ]; then \
+	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
 		dafny verify contracts/*.dfy; \
 	else \
 		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
@@ -196,7 +190,7 @@ test-integration:    ## Run integration tests
 	gotestsum --format testname -run "TestIntegration"
 
 .PHONY: test
-test: test-unit   ## Run unit tests (alias for test-unit)
+test: test-unit   ## Run unit tests
 
 .PHONY: infra-build
 infra-build:   ## Build all the local infra (docker-compose)
@@ -227,9 +221,6 @@ migrate-create: install-goose    ## Create a new database migration
 upgrade-deps:  ## Upgrade all dependencies to their latest versions
 	go get -u ./...
 	go mod tidy
-
-.PHONY: upgrade-libs
-upgrade-libs: upgrade-deps    ## Alias for upgrade-deps (deprecated)
 
 .PHONY: clean
 clean:  ## Clean build artifacts
