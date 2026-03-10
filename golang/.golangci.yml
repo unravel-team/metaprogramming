@@ -1,17 +1,35 @@
+version: "2"
 run:
   timeout: 5m
-
 linters:
-  disable-all: true
+  default: none
   enable:
+    - copyloopvar
     - errcheck
-    - govet
     - ineffassign
     - misspell
     - revive
     - staticcheck
+    - testifylint
     - unconvert
     - unused
-
-issues:
-  exclude-use-default: false
+    - govet
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - goimports
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

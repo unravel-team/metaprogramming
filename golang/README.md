@@ -1,66 +1,29 @@
-# Golang scaffold
+# metago
+Getting started quickly in Golang projects, inspired by [unravel/metaclj](https://github.com/unravel-team/metaclj)
 
-A Go starter with gofumpt, golangci-lint, gotestsum, air, and tagref.
+## How to use me
+Copy the Makefile into your Golang project
 
-## Quickstart
+Running the `make` command will show you the following (below). **Follow this list** from top to bottom, for fun and profit.
 
-1. Run `make doctor` to verify the required toolchain is present.
-2. Run `make init` to install dependencies and perform one-time setup.
-3. Use `make format`, `make check`, `make test`, and `make build` as your normal development loop.
-
-## Commands
-
-```text
-help                      # List the supported scaffold commands
-doctor                    # Verify toolchain prerequisites and platform assumptions
-init                      # Bootstrap dependencies and one-time setup
-sync                      # Alias for init
-install-air               # Install air for live reload
-install-gofumpt           # Install gofumpt
-install-golangci-lint     # Install golangci-lint
-install-gotestsum         # Install gotestsum
-install-gopls             # Install gopls
-install-dev-tools         # Install optional development tools
-check                     # Run linting and docs validation
-format                    # Apply canonical formatting
-test                      # Run the default test suite
-build-air                 # Build the live-reload binary
-build                     # Produce the default build artifact
-dev                       # Run the starter project with live reload
-server                    # Run the starter binary
-upgrade-libs              # Upgrade scaffold dependencies
-clean                     # Remove generated artifacts
+```
+help                      # A brief listing of all available commands
+sync                      # Download dependencies
+install-dev-tools         # Install all development tools
+build                     # Build the deployment artifact
+dev                       # Run in development mode with auto-reload, using air
+server                    # Run the server binary
+check                     # Check that the code is well linted, well typed, well documented
+format                    # Format the code using gofumpt
+test                      # Run the unit tests for the code
+upgrade-libs              # Install all the deps to their latest versions
+clean                     # Clean build artifacts
 ```
 
-## Starter shape
+## Recommended tooling:
 
-Support files:
-- `AGENTS.md`
-- `README.md`
-- `.aider.conf.yml`
-- `.air.toml`
-- `.env.sample`
-- `.gitignore`
-- `.golangci.yml`
-- `go.mod`
-- `dev_tools/hooks/pre-push`
-- `dev_tools/configuration/direnv.toml`
+### Direnv: For loading and unloading `.env` files correctly.
 
-Starter code:
-- `cmd/golang/main.go`
-- `internal/mathx/mathx.go`
-- `internal/mathx/mathx_test.go`
+[direnv](https://direnv.net/) is a fantastic tool for managing environment variables correctly.
 
-## Toolchain
-
-- `go`
-- `gofumpt`
-- `golangci-lint`
-- `gotestsum`
-- `tagref`
-
-## Provenance
-
-- Source template: `metago`
-- Imported from: `../metago`
-- Source revision: `ef102b1d347701bb08b1b86a237b31c801aabd63`
+The standard configuration for it is available at: [direnv.toml](dev_tools/configuration/direnv.toml). Copy this file to: `~/.config/direnv/direnv.toml`

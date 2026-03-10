@@ -1,58 +1,46 @@
-# TypeScript scaffold
+# metats
+Getting started quickly in Typescript projects, inspired by
+[unravel/metaclj](https://github.com/unravel-team/metaclj)
 
-A Bun-powered TypeScript starter with Biome, Vitest, and tagref checks.
+## DISCLAIMER
+This is an alpha project, the tooling, configuration and how these
+tools work with each other are not yet fully fleshed out. Please help
+me by contributing fixes where you can!
 
-## Quickstart
+## How to use me
+Copy the Makefile into your Typescript project
 
-1. Run `make doctor` to verify the required toolchain is present.
-2. Run `make init` to install dependencies and perform one-time setup.
-3. Use `make format`, `make check`, `make test`, and `make build` as your normal development loop.
+Running the `make` command will show you the following (below).
+**Follow this list** from top to bottom, for fun and profit.
 
-## Commands
-
-```text
-help                      # List the supported scaffold commands
-doctor                    # Verify toolchain prerequisites and platform assumptions
-init                      # Bootstrap dependencies and one-time setup
-install                   # Alias for init
-install-dev-tools         # Alias for init
-check                     # Run linting, typing, and docs validation
-format                    # Apply Biome formatting
-test                      # Run the default test suite
+```
+help                      # A brief listing of all available commands
+install                   # Install dependencies and create node_modules
+install-dev-tools         # Install all development tools (ESLint, Jest, Prettier, Typescript)
+upgrade-libs              # Upgrade all dependencies to their latest versions
+check                     # Check that the code is well linted, well typed, well documented
+format                    # Format code with Prettier and fix ESLint issues
+test                      # Run all the tests for the code
 test-watch                # Run tests in watch mode
-test-coverage             # Run tests with coverage
-build                     # Produce the default build artifact
-dev                       # Run the starter project in watch mode
-upgrade-libs              # Upgrade scaffold dependencies
-clean                     # Remove generated artifacts
+dev                       # Run the Next.js development server with Turbopack
+build                     # Build the Next.js application for production
+start                     # Start the production server
+docker-compose-build      # Build all the local infra (docker-compose)
+up                        # Bring up all the local infra (docker-compose)
+down                      # Bring down all the local infra (docker-compose)
+logs                      # Show all the logs (docker-compose)
+deploy                    # Deploy the current code to production
+clean-cache               # Clean bun cache and Next.js cache
+clean                     # Delete any existing artifacts
 ```
 
-## Starter shape
+## Recommended tooling:
 
-Support files:
-- `AGENTS.md`
-- `README.md`
-- `.aider.conf.yml`
-- `.gitignore`
-- `biome.json`
-- `bun.lock`
-- `package.json`
-- `tsconfig.json`
-- `dev_tools/hooks/pre-push`
-- `dev_tools/configuration/direnv.toml`
+### Direnv: For loading and unloading `.env` files correctly.
 
-Starter code:
-- `src/index.ts`
-- `tests/smoke.test.ts`
+[direnv](https://direnv.net/) is a fantastic tool for managing
+environment variables correctly.
 
-## Toolchain
-
-- `bun`
-- `node`
-- `tagref`
-
-## Provenance
-
-- Source template: `metats`
-- Imported from: `../metats`
-- Source revision: `efc6c234cea68f0568d0a38cd7661012416d43d7`
+The standard configuration for it is available at:
+[direnv.toml](dev_tools/configuration/direnv.toml). Copy this file to:
+`~/.config/direnv/direnv.toml`

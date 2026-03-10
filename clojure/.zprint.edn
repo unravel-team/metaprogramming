@@ -1,2 +1,1 @@
-{:fn-map {"with-context" "with-meta"}
- :map {:indent 0}}
+{:fn-map {"with-context" "with-meta"}, :map {:indent 0}}

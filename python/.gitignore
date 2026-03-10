@@ -1,22 +1,20 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
-.pytest_cache/
-.ruff_cache/
-.basedpyright/
-.build/
 build/
 dist/
 wheels/
-*.egg-info/
+*.egg-info
 
 # Virtual environments
-.venv/
+.venv
 
 # 12-factor apps
 .env
 
-# IDE and agent tools
-.vscode/
+# IDE
+.vscode
 .python-version
+
+# Aider
 .aider*
