@@ -23,7 +23,7 @@ doctor: ## Verify toolchain prerequisites
 	@echo "Go scaffold ready."
 
 .PHONY: init
-init: sync install-dev-tools ## Bootstrap dependencies and setup
+init: sync install-dev-tools install-hooks ## Bootstrap dependencies and setup
 
 .env: .env.sample
 	@if [ ! -f .env ]; then \

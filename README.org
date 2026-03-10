@@ -13,16 +13,15 @@
 
 * Common Make Targets
 
-| Target          | Purpose                              |
-|-----------------+--------------------------------------|
-| =help=          | Show available commands              |
-| =doctor=        | Verify required tools                |
-| =init=          | Bootstrap setup                      |
-| =install-hooks= | Set up git pre-push hook (optional)  |
-| =check=         | Run static analysis                  |
-| =format=        | Apply formatting                     |
-| =test=          | Run tests                            |
-| =build=         | Create artifact                      |
+| Target   | Purpose                 |
+|----------+-------------------------|
+| =help=   | Show available commands |
+| =doctor= | Verify required tools   |
+| =init=   | Bootstrap setup         |
+| =check=  | Run static analysis     |
+| =format= | Apply formatting        |
+| =test=   | Run tests               |
+| =build=  | Create artifact         |
 
 * Language-Specific Conventions
 

@@ -23,7 +23,7 @@ doctor: ## Verify toolchain prerequisites
 	@echo "Python scaffold ready."
 
 .PHONY: init
-init: venv install-dev-tools ## Bootstrap dependencies and setup
+init: venv install-dev-tools install-hooks ## Bootstrap dependencies and setup
 
 .env.sample:
 	touch .env.sample
