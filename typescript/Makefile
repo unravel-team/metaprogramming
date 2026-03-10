@@ -96,44 +96,44 @@ install-dafny:
 .git/hooks/pre-push:
 	@echo "Setting up Git hooks..."
 	@cat > .git/hooks/pre-push << 'EOF'
-#!/bin/sh
+	#!/bin/sh
 
-# Redirect output to stderr for visibility
-exec 1>&2
+	# Redirect output to stderr for visibility
+	exec 1>&2
 
-echo "Running pre-push checks..."
+	echo "Running pre-push checks..."
 
-echo "Running make check (lints/static analysis)"
+	echo "Running make check (lints/static analysis)"
 
-if ! make check; then
+	if ! make check; then
 	echo "❌ make check failed. Aborting push."
 	echo "   Fix the issues and try again."
 	exit 1
-fi
+	fi
 
-echo "Running make format (auto-formatting)"
-if ! make format; then
+	echo "Running make format (auto-formatting)"
+	if ! make format; then
 	echo "❌ make format failed. Aborting push."
 	exit 1
-fi
+	fi
 
-echo "Checking for uncommitted changes after formatting"
-if ! git diff --exit-code --quiet; then
+	echo "Checking for uncommitted changes after formatting"
+	if ! git diff --exit-code --quiet; then
 	echo "⚠️  Code was reformatted by 'make format'!"
 	echo "   Please commit these changes before pushing."
 	exit 1
-fi
+	fi
 
-echo "Running make test (unit tests)"
-if ! make test; then
+	echo "Running make test (unit tests)"
+	if ! make test; then
 	echo "❌ make test failed. Aborting push."
 	echo "   Fix the test failures and try again."
 	exit 1
-fi
+	fi
 
-echo "✅ All checks passed. Pushing changes..."
-exit 0
-EOF
+	echo "✅ All checks passed. Pushing changes..."
+	exit 0
+	EOF
 	@chmod +x .git/hooks/pre-push
 	@echo "✅ Git hooks installed successfully!"
 
