@@ -180,7 +180,6 @@ exit 0
 EOF
 	@chmod +x .git/hooks/pre-push
 	@echo "✅ Git hooks installed successfully!"
-	@echo "The pre-push hook will run make check, make format, and make test before each push."
 
 .PHONY: install-hooks
 install-hooks: .git/hooks/pre-push
