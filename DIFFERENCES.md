@@ -1,150 +1,201 @@
-# Deletion Suggestions for Makefiles
+# Language-Specific Makefile Features
 
-After reviewing the original Makefiles from oldmeta, here are suggestions for targets you might want to delete. These are just suggestions—you should decide what to keep based on your team's needs.
+This document highlights what each language's Makefile does that others do not. These differences reveal opportunities for building more standard tooling for codebase verification and analysis.
 
 ## Clojure (clojure/Makefile)
 
-### Potentially Deletable Targets
+### Unique to Clojure
 
 **repl-enrich**
-- Purpose: Launch REPL with Java source code paths via enrich-classpath
-- Suggestion: Delete if your team doesn't need to debug into Java sources
-- Command to delete: Remove the `.enrich-classpath-repl` target and `repl-enrich` phony target
+- Launches REPL with Java source code paths via enrich-classpath
+- Enables debugging into Java dependencies
+- Other languages typically have IDE support for this, but Clojure's tooling is REPL-first
 
 **install-kondo-configs**
-- Purpose: Download clj-kondo configuration from dependencies
-- Suggestion: Keep if you use external libraries; delete if you only write your own code
-- Command to delete: Remove this target and its `.clj-kondo` prerequisite
+- Downloads clj-kondo configuration from dependencies
+- Provides static analysis for external libraries
+- Most languages don't have tooling that automatically fetches linter configs for dependencies
 
 **install-zprint-config**
-- Purpose: Create .zprint.edn and .dir-locals.el files
-- Suggestion: Keep if you use zprint; delete if you don't
-- Command to delete: Remove this target and its prerequisites
+- Creates .zprint.edn and .dir-locals.el files
+- Sets up code formatting integration with editors
+- While other languages have formatters, Clojure's approach is tightly integrated with the REPL workflow
 
 **upgrade-libs**
-- Purpose: Upgrade all dependencies using antq
-- Suggestion: Delete if you manage dependencies manually or use a different tool
-- Command to delete: Remove `install-antq`, `.antqtool.lastupdated`, and `upgrade-libs` targets
+- Upgrades all dependencies using antq
+- Automated dependency auditing and upgrade suggestions
+- Other languages typically handle this via package managers (npm, pip, go mod), not Makefile targets
 
-**deploy** and **deploy-lib**
-- Purpose: Deploy to production or Clojars
-- Suggestion: Delete if scaffolds shouldn't include deployment logic
-- Command to delete: Remove both targets
+### Standardization Opportunities
+- REPL-first workflow support could be standardized across languages
+- Automatic linter config fetching from dependencies is a pattern that could benefit other ecosystems
 
 ## Go (golang/Makefile)
 
-### Potentially Deletable Targets
+### Unique to Go
 
 **install-air**
-- Purpose: Install air for hot-reload in development
-- Suggestion: Delete if you don't do web development or use a different hot-reload tool
-- Command to delete: Remove this target and the `dev` target that depends on it
+- Installs air for hot-reload in development
+- Go's compiled nature requires a specific hot-reload tool
+- Other interpreted languages (Python, Node) often have built-in hot-reload
 
 **install-gopls**
-- Purpose: Install Go language server for IDE support
-- Suggestion: Delete if you don't need IDE integration in the scaffold
-- Command to delete: Remove this target from `install-dev-tools`
+- Installs Go language server for IDE support
+- Go's toolchain is opinionated and includes gopls as the standard LSP
+- Other languages have multiple LSP options
 
 **sync**
-- Purpose: Download and vendor dependencies
-- Suggestion: Keep - this is useful for dependency management
+- Downloads and vendors dependencies
+- Go's vendor/ directory workflow is language-specific
+- Other languages typically use package manager commands (npm install, pip install)
 
-**install-hooks**
-- Purpose: Set up git pre-push hooks
-- Suggestion: Keep - this enforces quality checks
+### Standardization Opportunities
+- Hot-reload tooling varies significantly across compiled vs interpreted languages
+- Dependency vendoring is a concept that could be standardized
 
 ## Python (python/Makefile)
 
-### Potentially Deletable Targets
+### Unique to Python
 
 **test-integration** and **test-llm**
-- Purpose: Run specific test categories
-- Suggestion: Delete if you only run unit tests; keep if you need separate test suites
-- Command to delete: Remove these phony targets
+- Separate test categories for integration and LLM testing
+- Python's testing ecosystem (pytest) makes test categorization easy
+- Other languages typically run all tests or use tags, but Python's explicit test-type targets are notable
 
 **install-bandit**
-- Purpose: Install bandit security linter
-- Suggestion: Delete if security scanning is done separately; keep for development-time security checks
-- Command to delete: Remove this target from `install-dev-tools` and bandit check from `check` target
+- Installs bandit security linter
+- Runtime security scanning is more critical in Python due to its dynamic nature
+- Compiled languages catch many of these issues at compile time
 
 **docker-build**, **docker-compose-build**
-- Purpose: Build Docker images
-- Suggestion: Delete if scaffolds shouldn't include Docker setup
-- Command to delete: Remove these targets and their prerequisites
+- Build Docker images with Python-specific configurations
+- Python's dependency management (requirements.txt, poetry) requires specific Docker setup
+- Other languages have similar needs but different dependency formats
 
 **up**, **down**, **migrate**
-- Purpose: Manage local infrastructure (Docker Compose, databases)
-- Suggestion: Delete if scaffolds shouldn't include infrastructure management
-- Command to delete: Remove these targets
+- Manage local infrastructure (Docker Compose, databases)
+- Python web frameworks (Django, Flask) have strong database migration tooling
+- The integration of database migrations into the Makefile is more common in Python projects
 
-**deploy**, **rollback**
-- Purpose: Deploy to production
-- Suggestion: Delete if scaffolds shouldn't include deployment logic
-- Command to delete: Remove these targets
+### Standardization Opportunities
+- Security-focused linting could be standardized, especially for dynamic languages
+- Database migration tooling integration could be abstracted
 
 ## TypeScript (typescript/Makefile)
 
-### Potentially Deletable Targets
+### Unique to TypeScript
 
 **ci**
-- Purpose: Run bun ci command
-- Suggestion: Delete if not needed in CI; keep if it's useful
-- Command to delete: Remove this target
+- Runs bun ci command
+- TypeScript's ecosystem is rapidly evolving with new runtimes (bun, deno)
+- The presence of a `ci` target is a nod to TypeScript's CI/CD integration needs
 
-**install-dev-tools** (if exists)
-- Purpose: Install development-specific tools
-- Suggestion: Review and keep only what your team uses
-- Command to delete: Remove unused tool installation targets
+**install-dev-tools** (tooling varies)
+- TypeScript's tooling landscape is fragmented (npm, yarn, pnpm, bun)
+- Makefiles in TypeScript projects often need to accommodate multiple package managers
+- Other languages have more canonical toolchains
 
-## General Recommendations
+### Standardization Opportunities
+- Multi-runtime support (node, bun, deno) could be standardized
+- Package manager abstraction could be built into standard tooling
 
-### Keep These Core Targets
-- `help` - Essential for discoverability
-- `doctor` - Essential for toolchain verification
-- `init` - Essential for bootstrapping
-- `check` - Essential for code quality
-- `format` - Essential for consistency
-- `test` - Essential for verification
-- `build` - Essential for creating artifacts
+## Cross-Language Patterns
 
-### Consider Deleting These Categories
-- Deployment targets (deploy, rollback) - scaffolds shouldn't dictate deployment
-- Infrastructure targets (docker, docker-compose, migrate) - scaffolds shouldn't include infrastructure
-- Hot-reload targets (air, dev) - unless doing web development
-- Tool installation targets for niche tools - keep only what's broadly useful
+### Common Targets (Standardized)
+These targets appear across all languages and are good candidates for standard tooling:
+- `help` - Discoverability
+- `doctor` - Toolchain verification
+- `init` - Bootstrapping
+- `check` - Code quality
+- `format` - Consistency
+- `test` - Verification
+- `build` - Artifact creation
 
-### Keep These Categories
-- Code quality targets (linters, formatters, type checkers)
-- Test targets (unit tests, maybe integration tests)
-- Dependency management targets (sync, install)
-- Git hooks (pre-push quality checks)
+### Language-Specific Patterns
 
-## How to Delete
+**Deployment Targets**
+- Clojure: `deploy`, `deploy-lib` (Clojars-specific)
+- Python: `deploy`, `rollback` (often cloud-provider specific)
+- Other languages: Typically use CI/CD pipelines instead of Makefile targets
 
-1. Find the target definition in the Makefile
-2. Delete the target line and its commands
-3. Remove the target from any `.PHONY:` declarations
-4. Remove the target from any other targets that depend on it
-5. Test the Makefile still works with `make help`
+**Infrastructure Targets**
+- Python: `up`, `down`, `migrate` (Django/Flask ecosystem)
+- Go: Often uses docker-compose separately
+- TypeScript: Varies by framework (Next.js, Express, etc.)
 
-## Example: Deleting a Target
+**Hot-Reload Targets**
+- Go: `install-air`, `dev` (compiled language requirement)
+- Python: Often handled by framework (uvicorn --reload)
+- TypeScript: Framework-specific (next dev, vite dev)
 
-To delete the `repl-enrich` target from clojure/Makefile:
+**Tool Installation Targets**
+- Clojure: Highly opinionated (clj-kondo, zprint, antq)
+- Go: Standardized (gopls, air)
+- Python: Diverse (bandit, black, mypy, pytest)
+- TypeScript: Fragmented (eslint, prettier, typescript itself)
 
-```makefile
-# DELETE THESE LINES:
-.PHONY: repl-enrich
-repl-enrich: .enrich-classpath-repl    ## Launch a repl enriched with Java source code paths
-	@if grep --silent "^clojure" .enrich-classpath-repl; then \
-		echo "Executing: $$(cat .enrich-classpath-repl)" && \
-		eval $$(cat .enrich-classpath-repl); \
-	else \
-		echo "Falling back to Clojure repl... (you can avoid further falling back by removing .enrich-classpath-repl)"; \
-		clojure $(DEPS_MAIN_OPTS); \
-	fi
+## Standardization Opportunities
 
-.enrich-classpath-repl: Makefile deps.edn $(wildcard $(HOME)/.clojure/deps.edn) $(wildcard $(XDG_CONFIG_HOME)/.clojure/deps.edn)
-	cd $$(mktemp -d -t enrich-classpath.XXXXXX); clojure -Sforce -Srepro -J-XX:-OmitStackTraceInFastThrow -J-Dclojure.main.report=stderr -Sdeps '{:deps {mx.cider/tools.deps.enrich-classpath {:mvn/version $(ENRICH_CLASSPATH_VERSION)}}}' -M -m cider.enrich-classpath.clojure "clojure" "$(HERE)" "true" $(DEPS_MAIN_OPTS) | grep "^clojure" > $(HERE)/$@
+### 1. Dependency Auditing
+- Clojure has `upgrade-libs` (antq)
+- Python has `pip-audit`, `safety`
+- Go has `go mod tidy` and `govulncheck`
+- TypeScript has `npm audit`
+- **Opportunity**: A unified interface for dependency security scanning
+
+### 2. Hot-Reload Development
+- Go: air
+- Python: uvicorn --reload, watchdog
+- TypeScript: vite, next dev, parcel
+- **Opportunity**: A language-agnostic hot-reload abstraction
+
+### 3. Database Migrations
+- Python: Often in Makefile (`make migrate`)
+- Go: Typically separate (migrate, golang-migrate)
+- TypeScript: Prisma, TypeORM, or framework-specific
+- **Opportunity**: Standard database migration interface
+
+### 4. Git Hooks
+- Most languages: `install-hooks` target
+- Implementation varies: pre-commit, husky, lein-git-down
+- **Opportunity**: Unified git hook management
+
+### 5. Linter Config Management
+- Clojure: Auto-fetches configs from dependencies
+- Other languages: Manual config or .gitignore-d files
+- **Opportunity**: Automatic linter config propagation
+
+## How to Use This Document
+
+When building standard tooling:
+1. **Identify common patterns** - Look for targets that appear across languages
+2. **Spot unique needs** - See what each language requires that others don't
+3. **Find abstraction points** - Look for similar functionality with different implementations
+4. **Prioritize standardization** - Focus on high-value, high-frequency patterns (test, check, format)
+5. **Respect language differences** - Don't force uniformity where language ergonomics matter
+
+## Example: Building a Standard Dependency Auditor
+
+Currently, each language has a different command:
+```bash
+# Clojure
+make upgrade-libs
+
+# Python
+pip-audit check
+# or
+safety check
+
+# Go
+govulncheck ./...
+
+# TypeScript
+npm audit
 ```
 
-Also delete the `ENRICH_CLASSPATH_VERSION` variable if it's only used by this target.
+A standard tool could provide a unified interface:
+```bash
+make audit-dependencies  # Works for all languages
+```
+
+The Makefile would delegate to the appropriate language-specific tool, but the interface is consistent.
