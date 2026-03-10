@@ -208,7 +208,7 @@ ENRICH_CLASSPATH_VERSION="1.19.3"
 
 # Launches a repl, falling back to vanilla Clojure repl if something went wrong during classpath calculation.
 .PHONY: repl-enrich
-repl-enrich: .enrich-classpath-repl    ## Launch a repl enriched with Java source code paths
+repl-enrich: .enrich-classpath-repl    # Launch a repl enriched with Java source code paths
 	@if grep --silent "^clojure" .enrich-classpath-repl; then \
 		echo "Executing: $$(cat .enrich-classpath-repl)" && \
 		eval $$(cat .enrich-classpath-repl); \
@@ -246,15 +246,15 @@ format:       ## Format the code to conform with our standards
 	zprint -lfw $(CLOJURE_SOURCES)
 
 .PHONY: test-unit
-test-unit:    ## Run unit tests
+test-unit:  # Run unit tests
 	clojure -T:build test
 
 .PHONY: test-llm
-test-llm:    ## Run LLM-specific tests
+test-llm:   # Run LLM-specific tests
 	@echo "Run LLM tests here (add appropriate test selector)"
 
 .PHONY: test-integration
-test-integration:    ## Run integration tests
+test-integration:   # Run integration tests
 	@echo "Run integration tests here (add appropriate test selector)"
 
 .PHONY: test-all
@@ -262,11 +262,11 @@ test-all:
 	clojure -M:poly test :all
 
 .PHONY: test-coverage
-test-coverage:  ## Run coverage reports for the code using Clofidence
+test-coverage:   # Run coverage reports for the code using Clofidence
 	clojure -X:dev:test:clofidence
 
 .PHONY: test-poly
-test-poly:    ## Run Poly tests for the code
+test-poly:   # Run Poly tests for the code
 	clojure -M:poly test
 
 .PHONY: test
@@ -302,7 +302,7 @@ infra-down:       ## Bring down all the local infra (docker-compose)
 	docker compose down
 
 .PHONY: infra-logs
-infra-logs:      ## Show all the logs (docker-compose)
+infra-logs:   # Show all the logs (docker-compose)
 	docker compose logs
 
 .PHONY: migrate
@@ -310,7 +310,7 @@ migrate: install-migratus    ## Run database migrations (using Migratus)
 	@echo "Run Migratus migrations here (requires migratus configuration)"
 
 .PHONY: migrate-create
-migrate-create: install-migratus    ## Create a new database migration
+migrate-create: install-migratus  # Create a new database migration
 	@echo "Create Migratus migration here (requires migratus configuration)"
 
 .PHONY: build
@@ -319,7 +319,7 @@ build: check    ## Build the deployment artifact
 	clojure -T:build install
 
 .PHONY: localinstall
-localinstall: build   ## Install the artifact locally
+localinstall: build   # Install the artifact locally
 	clojure -T:build install
 
 .PHONY: deploy
@@ -327,7 +327,7 @@ deploy: build    ## Deploy the current code to production
 	@echo "Run fly.io deployment commands here!"
 
 .PHONY: deploy-lib
-deploy-lib: build  ## Deploy to Clojars. needs `CLOJARS_USERNAME` and `CLOJARS_PASSWORD` env vars
+deploy-lib: build  # Deploy to Clojars. needs `CLOJARS_USERNAME` and `CLOJARS_PASSWORD` env vars
 	clojure -T:build deploy
 
 .PHONY: clean-projects

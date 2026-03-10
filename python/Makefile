@@ -23,15 +23,15 @@ doctor: ## Verify toolchain prerequisites
 	@echo "Python scaffold ready."
 
 .PHONY: init
-init: venv install-dev-tools install-dafny install-hooks ## Bootstrap dependencies and setup
+init: venv install-ruff install-pytest install-basedpyright install-tagref install-bandit .gitignore install-dafny install-hooks ## Bootstrap dependencies and setup
 
-.env.sample:
-	touch .env.sample
+.env.example:
+	touch .env.example
 
-.env: .env.sample    ## Copy .env.sample to .env if .env doesn't exist
+.env: .env.example
 	@if [ ! -f .env ]; then \
-		echo "Creating .env from .env.sample..."; \
-		cp .env.sample .env; \
+		echo "Creating .env from .env.example..."; \
+		cp .env.example .env; \
 		echo "✓ .env created. Please edit it with your actual values."; \
 	else \
 		echo ".env already exists, skipping..."; \
@@ -67,7 +67,7 @@ src:
 	uv sync --locked --no-cache
 
 .PHONY: venv
-venv: .venv .env    ## Create the .venv and the .env files
+venv: .venv .env
 	@echo "Virtual environment created at .venv/"
 
 .PHONY: install-ruff
@@ -199,9 +199,6 @@ AGENTS.md:
 .gitignore:
 	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metapy][metapy]] project"
 
-.PHONY: install-dev-tools
-install-dev-tools: install-ruff install-pytest install-ty  install-basedpyright install-tagref install-bandit install-hooks AGENTS.md .aider.conf.yml .gitignore    ## Install all development tools (Ruff, Pytest, Ty, Tagref, Bandit, Hooks)
-
 .PHONY: check-bandit
 check-bandit:
 	bandit -q -ii -lll -c .bandit.yml -r src/
@@ -248,15 +245,15 @@ megalinter:
 	docker run --rm -v "$(HERE):/tmp/lint" oxsecurity/megalinter:v8
 
 .PHONY: test-unit
-test-unit:    ## Run only the unit tests
+test-unit:
 	uv run pytest -m "unit"
 
 .PHONY: test-llm
-test-llm:    ## Run only the llm tests
+test-llm:
 	uv run pytest -m "llm"
 
 .PHONY: test-integration
-test-integration:    ## Run only the integration tests
+test-integration:
 	uv run pytest -m "integration"
 
 .PHONY: test
@@ -267,7 +264,7 @@ build: check     ## Build the deployment artifact
 	uv build
 
 .PHONY: docker-build
-docker-build:   ## Build the FastAPI server Dockerfile
+docker-build:  # Build the FastAPI server Dockerfile
 	docker build -f Dockerfile -t metapy:latest -t metapy:$$(git rev-parse --short HEAD) .
 
 .PHONY: infra-build
@@ -287,7 +284,7 @@ infra-logs:
 	docker compose logs
 
 .PHONY: infra-down-clean
-infra-down-clean:  ## Bring down all the local infra and delete volumes
+infra-down-clean:
 	@echo "Warning: Deleting volumes will lead to data loss. You will start from scratch and this may introduce bugs (e.g., if your code does not work with existing data in postgres)."
 	@read -p "Are you sure you want to proceed? (yes/no): " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
@@ -350,7 +347,7 @@ deploy-internal:
 deploy: build backup-current-image deploy-internal tag-deploy-internal    ## Deploy with backup and auto-tagging
 
 .PHONY: rollback
-rollback:    ## Rollback to the previous version stored in backup
+rollback:  # Rollback to the previous version stored in backup
 	@if [ ! -f .fly_image.backup ]; then \
 		echo "❌ No backup image found (.fly_image.backup missing)"; \
 		echo "Cannot rollback without a backup image."; \
@@ -376,10 +373,10 @@ deploy-build-only:
 	@echo "✅ Build-only Deploy complete! Please update .fly_image manually!"
 
 .PHONY: prepare
-prepare: deploy-build-only backup-current-image    ## Build the latest code and upload image to fly.io. Useful in hot-swap and migration situations
+prepare: Build the latest code and upload image to fly.io. Useful in hot-swap and migration situations
 
 .PHONY: deploy-reuse-image
-deploy-reuse-image:	.fly_image    ## Deploy only config changes to production, reusing the latest image
+deploy-reuse-image: Deploy only config changes to production, reusing the latest image
 	@echo "Deploying config-only changes..."
 	@IMAGE=$$(cat .fly_image); \
 	echo "Using current production image: $$IMAGE"; \
@@ -395,7 +392,7 @@ upgrade-deps:    ## Upgrade all dependencies to their latest versions
 	uv sync --upgrade
 
 .PHONY: clean-cache
-clean-cache:    ## Clean UV Cache (only needed in extreme conditions)
+clean-cache: Clean UV Cache (only needed in extreme conditions)
 	@echo "Cleaning cache! This removes all downloaded deps!"
 	uv cache clean
 

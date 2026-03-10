@@ -23,7 +23,7 @@ doctor: ## Verify toolchain prerequisites
 	@echo "Go scaffold ready."
 
 .PHONY: init
-init: sync install-dev-tools install-dafny install-hooks ## Bootstrap dependencies and setup
+init: sync install-air install-gofumpt install-golangci-lint install-gopls install-gotestsum install-tagref install-goose install-hooks install-dafny   ## Bootstrap dependencies and setup
 
 .env: .env.sample
 	@if [ ! -f .env ]; then \
@@ -38,7 +38,7 @@ go.mod:
 	go mod init metago
 
 .PHONY: sync
-sync: go.mod .env   ## Download dependencies
+sync: go.mod .env   # Download dependencies
 	go mod download
 	go mod tidy && go mod vendor
 
@@ -135,9 +135,6 @@ CONVENTIONS.md:
 .gitignore:
 	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metago][metago]] project"
 
-.PHONY: install-dev-tools
-install-dev-tools: install-air install-gofumpt install-golangci-lint install-gopls install-gotestsum install-tagref install-goose install-hooks CONVENTIONS.md .aider.conf.yml .gitignore    ## Install all development tools
-
 .PHONY: check-lint
 check-lint:
 	golangci-lint run
@@ -161,8 +158,8 @@ build-air:
 .PHONY: build
 build: check build-air       ## Build the deployment artifact
 
-.PHONY: server
-dev:  install-air  ## Run in development mode with auto-reload, using air
+.PHONY: dev
+dev: install-air  ## Run in development mode with auto-reload, using air
 	air -c .air.toml
 
 .PHONY: server
@@ -178,15 +175,15 @@ format:     ## Format the code using gofumpt
 	gofmt -w .
 
 .PHONY: test-unit
-test-unit:   ## Run unit tests
+test-unit:   # Run unit tests
 	gotestsum --format testname -run "TestUnit|[^I]Test" -skip "Integration|LLM"
 
 .PHONY: test-llm
-test-llm:    ## Run LLM-specific tests
+test-llm:   # Run LLM-specific tests
 	gotestsum --format testname -run "TestLLM"
 
 .PHONY: test-integration
-test-integration:    ## Run integration tests
+test-integration:   # Run integration tests
 	gotestsum --format testname -run "TestIntegration"
 
 .PHONY: test
@@ -205,7 +202,7 @@ infra-down:       ## Bring down all the local infra (docker-compose)
 	docker compose down
 
 .PHONY: infra-logs
-infra-logs:      ## Show all the logs (docker-compose)
+infra-logs:   # Show all the logs (docker-compose)
 	docker compose logs
 
 .PHONY: migrate
@@ -213,7 +210,7 @@ migrate: install-goose    ## Run database migrations (using Goose)
 	goose -dir migrations postgres "user=postgres password=postgres dbname=metago host=localhost sslmode=disable" up
 
 .PHONY: migrate-create
-migrate-create: install-goose    ## Create a new database migration
+migrate-create: install-goose  # Create a new database migration
 	@read -p "Enter migration name: " name; \
 	goose -dir migrations create $$name sql
 

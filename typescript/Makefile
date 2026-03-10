@@ -24,18 +24,16 @@ doctor: ## Verify toolchain prerequisites
 	done
 	@echo "TypeScript scaffold ready."
 
+.PHONY: install
+install:
+	bun install
+
 .PHONY: init
-init: install-sveltekit install-vitest install-biome install-svelte-check install-dbmate install-dafny install-hooks .gitignore    ## Bootstrap dependencies and setup
+init: install install-sveltekit install-vitest install-biome install-svelte-check install-dbmate install-dafny install-hooks .gitignore    ## Bootstrap dependencies and setup
 
 .PHONY: ci
 ci:
 	bun ci
-
-node_modules:
-	bun install
-
-.PHONY: install
-install: node_modules    ## Install dependencies and create node_modules
 
 package.json:
 	@if [ ! -f package.json ]; then \
@@ -45,7 +43,7 @@ package.json:
 	fi
 
 .PHONY: install-sveltekit
-install-sveltekit: package.json    ## Install SvelteKit dependencies (does not scaffold a project)
+install-sveltekit: package.json
 	@echo "Installing SvelteKit dependencies (requires an existing SvelteKit project scaffold)..."
 	bun install --save-dev @sveltejs/kit @sveltejs/adapter-auto @sveltejs/vite-plugin-svelte svelte vite
 	@node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts.dev ? 0 : 1)" >/dev/null 2>&1 || bun pkg set scripts.dev="vite dev"
@@ -183,26 +181,26 @@ format:    ## Format code with Biome
 	fi
 
 .PHONY: test-unit
-test-unit:    ## Run unit tests
+test-unit:
 	bun test --config vitest.config.unit.ts
 
 .PHONY: test-llm
-test-llm:    ## Run LLM-specific tests
+test-llm:
 	bun test --config vitest.config.llm.ts
 
 .PHONY: test-integration
-test-integration:    ## Run integration tests
+test-integration:
 	bun test --config vitest.config.integration.ts
 
 .PHONY: test
 test: test-unit    ## Run unit tests
 
 .PHONY: test-watch
-test-watch:    ## Run tests in watch mode
+test-watch:
 	bun run test:watch
 
 .PHONY: test-coverage
-test-coverage:    ## Run tests with coverage report
+test-coverage:
 	bun run test:coverage
 
 .PHONY: dev
@@ -214,7 +212,7 @@ build: check    ## Build the SvelteKit application for production
 	bun run build
 
 .PHONY: preview
-preview:    ## Preview the production build locally
+preview:
 	bun run preview
 
 .PHONY: infra-build
@@ -230,7 +228,7 @@ infra-down:       ## Bring down all the local infra (docker-compose)
 	docker compose down
 
 .PHONY: infra-logs
-infra-logs:      ## Show all the logs (docker-compose)
+infra-logs:
 	docker compose logs
 
 .PHONY: migrate
@@ -238,12 +236,12 @@ migrate: install-dbmate    ## Run database migrations (using dbmate)
 	dbmate up
 
 .PHONY: migrate-create
-migrate-create: install-dbmate    ## Create a new database migration
+migrate-create:  install-dbmate
 	@read -p "Enter migration name: " name; \
 	dbmate new $$name
 
 .PHONY: migrate-rollback
-migrate-rollback: install-dbmate    ## Rollback the last database migration
+migrate-rollback: Rollback the last database migration
 	dbmate rollback
 
 .PHONY: deploy
@@ -251,7 +249,7 @@ deploy: build    ## Deploy the current code to production
 	@echo "Run deployment commands here (Vercel, Netlify, etc.)!"
 
 .PHONY: clean-cache
-clean-cache:    ## Clean bun cache and SvelteKit/Vite caches
+clean-cache:
 	bun cache clean --force
 	rm -rf .svelte-kit
 	rm -rf node_modules/.vite
