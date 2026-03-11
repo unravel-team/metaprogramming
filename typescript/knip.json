@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/index.ts"],
+  "project": ["tsconfig.json"],
+  "ignore": [
+    "**/*.config.*",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    ".svelte-kit/**",
+    "coverage/**"
+  ]
+}

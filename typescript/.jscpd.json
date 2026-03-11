@@ -1,0 +1,13 @@
+{
+  "threshold": 5,
+  "ignore": [
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.config.*",
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    ".svelte-kit/**",
+    "coverage/**"
+  ]
+}

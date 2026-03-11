@@ -168,8 +168,16 @@ check-dafny:
 		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
 	fi
 
+.PHONY: check-knip
+check-knip:
+	bunx knip
+
+.PHONY: check-jscpd
+check-jscpd:
+	bunx jscpd src tests
+
 .PHONY: check
-check: check-biome check-typescript check-tagref check-dafny    ## Check that the code is well linted, well typed, well documented
+check: check-biome check-typescript check-tagref check-knip check-jscpd check-dafny    ## Check that the code is well linted, well typed, well documented
 	@echo "All checks passed!"
 
 .PHONY: format
