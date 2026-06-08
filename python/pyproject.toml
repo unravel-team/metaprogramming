@@ -20,13 +20,16 @@ dependencies = [
 dev = [
   "bandit>=1.8,<2",
   "basedpyright>=1.29,<2",
+  "coverage>=7,<8",
   "httpx>=0.28,<1",
   "hypothesis>=6.0,<7",
   "pip-audit>=2.8,<3",
   "pytest>=8.3,<10",
   "pytest-asyncio>=0.25,<2",
   "pytest-cov>=6.0,<8",
+  "radon>=6,<7",
   "ruff>=0.9,<1",
+  "yamllint>=1,<2",
   "ty>=0.0.1a21,<1",
 ]
 
@@ -41,6 +44,8 @@ markers = [
   "property: generative tests using Hypothesis",
   "integration: tests that require external infrastructure",
   "llm: tests that exercise LLM-facing behavior",
+  "e2e: End-to-end tests (requires full stack)",
+  "slow: Slow-running tests",
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -54,10 +59,14 @@ select = ["E", "F", "UP", "B", "SIM", "I"]
 ignore = ["E501"]
 
 [tool.basedpyright]
+include = ["src/"]
 pythonVersion = "3.12"
-reportAny = false
-reportExplicitAny = false
-reportUnknownMemberType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
-reportUnknownLambdaType = false
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportImplicitStringConcatenation = false # conflicts with ruff formatter
+
+[tool.uv]
+override-dependencies = [
+  "torch; sys_platform == 'never'",
+]
+exclude-newer = "7 days"
