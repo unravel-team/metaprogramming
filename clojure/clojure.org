@@ -298,6 +298,7 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
 
 #+begin_src clojure :tangle "build.clj"
 (ns build
+  (:refer-clojure :exclude [test])
   (:require [clojure.string :as str]
             [clojure.tools.build.api :as b]))
 
@@ -327,7 +328,23 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
 
 (defn pom-path [_] (println (pom-file)))
 
+(defn- run-command!
+  [command-args]
+  (println (str "Running: " (str/join " " command-args)))
+  (let [{:keys [exit], :as result} (b/process {:command-args command-args})]
+    (when-not (zero? exit)
+      (throw (ex-info (str "Command failed: " (str/join " " command-args))
+                      result)))))
+
+(defn- clojure! [& args] (run-command! (into ["clojure" "-Srepro"] args)))
+
 (defn clean [_] (b/delete {:path "target"}))
+
+(defn test [_] (clojure! "-M:test"))
+
+(defn test-llm [_] (clojure! "-M:test" "-i" ":llm"))
+
+(defn test-integration [_] (clojure! "-M:test" "-i" ":integration"))
 
 (defn jar
   [_]
@@ -340,6 +357,20 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
                 :src-dirs ["src"]})
   (b/jar {:class-dir class-dir, :jar-file (jar-file)})
   (println (str "Created " (jar-file))))
+
+(defn install
+  [_]
+  (jar nil)
+  (b/install {:basis @basis,
+              :lib lib,
+              :version (version),
+              :jar-file (jar-file),
+              :class-dir class-dir})
+  (println (format "Installed %s %s locally" lib (version))))
+
+(defn deploy
+  [_]
+  (run-command! ["make" "deploy-clojars"]))
 #+end_src
 ** app/metaprogramming/server.clj
 
