@@ -16,3 +16,4 @@ __pycache__/
 **/tmp/
 **/.env
 .agents/
+.pi/subagents/
