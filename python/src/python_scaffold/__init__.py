@@ -1,3 +1,5 @@
-from .core import add
+"""Public library API for the Python scaffold."""
 
-__all__ = ["add"]
+from .core import example
+
+__all__ = ["example"]

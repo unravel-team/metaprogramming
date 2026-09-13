@@ -1,0 +1,3 @@
+# Org contains tangle-source copies of generated directives; scan generated files only.
+ignore_rules:
+  - /python.org
