@@ -1,16 +1,21 @@
-"""Example test file showing pytest patterns."""
+"""Unit tests exercise the shipped library and HTTP application."""
 
 import pytest
+from fastapi.testclient import TestClient
+
+from python_scaffold.api import app
+from python_scaffold.core import example
 
 pytestmark = pytest.mark.unit
 
 
-def test_example() -> None:
-    """Basic test example."""
-    assert True
+@pytest.mark.parametrize("value, expected", [(0, 0), (2, 4), (-3, -6)])
+def test_example(value: int, expected: int) -> None:
+    assert example(value) == expected
 
 
-@pytest.mark.parametrize("a,b,expected", [(1, 2, 3), (2, 3, 5)])
-def test_parametrized(a: int, b: int, expected: int) -> None:
-    """Parametrized test example."""
-    assert a + b == expected
+def test_health() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
