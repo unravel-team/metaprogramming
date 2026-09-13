@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +142,65 @@ class ScaffoldContract(unittest.TestCase):
                 # A nested, uninitialized scaffold must not tag the containing repo.
                 result = run(["make", "-s", "release"], dest)
                 self.assertNotEqual(result.returncode, 0, "Release must reject non-repository copies")
+
+    def test_python_bump_updates_lock_metadata(self):
+        if "python" not in LANGUAGES:
+            self.skipTest("Python lane only")
+        with scaffold("python") as dest:
+            result = run(["make", "-s", "patch"], dest)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            project = tomllib.loads((dest / "pyproject.toml").read_text())["project"]
+            locked = tomllib.loads((dest / "uv.lock").read_text())
+            package = next(p for p in locked["package"] if p["name"] == project["name"])
+            self.assertEqual(package["version"], project["version"], "Bump must keep UV lock consistent")
+
+    @unittest.skipUnless(shutil.which("emacs"), "Emacs required")
+    def test_bumps_survive_tangling(self):
+        for language in (name for name in LANGUAGES if name in ("python", "clojure")):
+            with self.subTest(language=language), scaffold(language) as dest:
+                result = run(["make", "-s", "patch"], dest)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                before = run(["make", "-s", "version"], dest).stdout.strip()
+                expression = f'(progn (require \'org) (require \'ob-tangle) (setq org-confirm-babel-evaluate nil) (org-babel-tangle-file "{dest / (language + ".org")}"))'
+                result = run(["emacs", "--batch", "-Q", "--eval", expression], dest)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(run(["make", "-s", "version"], dest).stdout.strip(), before)
+
+    def test_pypi_refuses_stale_tags_and_untracked_files(self):
+        if "python" not in LANGUAGES:
+            self.skipTest("Python lane only")
+        for dirty in (False, True):
+            with self.subTest(untracked=dirty), scaffold("python") as dest:
+                pyproject = dest / "pyproject.toml"
+                pyproject.write_text(pyproject.read_text().replace('name = "python-scaffold"', 'name = "contract-fixture-only"'))
+                makefile = dest / "Makefile"
+                # Exercise publication guard without running expensive build gates.
+                makefile.write_text(re.sub(r"^build:[^\n]*\n(?:\t[^\n]*\n|\n)*", "build:\n\t@true\n", makefile.read_text(), flags=re.M))
+                def git(*args):
+                    result = run(["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args], dest)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                git("init", "-q")
+                git("config", "user.email", "fixture@example.invalid")
+                git("config", "user.name", "Fixture")
+                git("add", ".")
+                git("commit", "-qm", "fixture")
+                version = run(["make", "-s", "version"], dest).stdout.strip()
+                git("tag", "-a", f"v{version}", "-m", "fixture release")
+                readme = dest / "README.md"
+                if dirty:
+                    (dest / "untracked-source.txt").write_text("not released")
+                else:
+                    readme.write_text(readme.read_text() + "\nUnreleased change.\n")
+                    git("add", "README.md")
+                    git("commit", "-qm", "unreleased change")
+                # Fake executable lives outside repository cleanliness check.
+                with tempfile.TemporaryDirectory() as tools:
+                    fake_tool(Path(tools), "uv", 'echo "$*" > "$PUBLISH_LOG"')
+                    calls = Path(tools) / "publish.calls"
+                    env = dict(os.environ, PATH=f"{tools}:{os.environ['PATH']}", UV_PUBLISH_TOKEN="test-only-not-a-token", PUBLISH_LOG=str(calls))
+                    result = run(["make", "-s", "deploy-pypi"], dest, env=env)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse(calls.exists(), "Publication escaped release-state guard")
 
     def test_required_templates(self):
         expected = {
