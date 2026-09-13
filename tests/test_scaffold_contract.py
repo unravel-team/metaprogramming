@@ -202,6 +202,56 @@ class ScaffoldContract(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertFalse(calls.exists(), "Publication escaped release-state guard")
 
+    @unittest.skipUnless(shutil.which("go"), "Go required for selector integration")
+    def test_go_selectors_keep_ordinary_tests(self):
+        if "golang" not in LANGUAGES:
+            self.skipTest("Go lane only")
+        with scaffold("golang") as dest:
+            fixture = dest / "internal/mathx/selectors_test.go"
+            fixture.write_text('''package mathx
+import "testing"
+func TestParse(t *testing.T) { t.Log("ORDINARY_PARSE") }
+func TestInsert(t *testing.T) { t.Log("ORDINARY_INSERT") }
+func TestLogin(t *testing.T) { t.Log("ORDINARY_LOGIN") }
+func TestPropertyIncluded(t *testing.T) { t.Log("PROPERTY_INCLUDED") }
+func TestIntegrationExcluded(t *testing.T) { t.Fatal("integration escaped") }
+func TestLLMExcluded(t *testing.T) { t.Fatal("LLM escaped") }
+''')
+            for target in ("test-unit", "test-coverage"):
+                with self.subTest(target=target):
+                    result = run(["make", "-s", target, "TEST_ARGS=-v"], dest)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    for marker in ("ORDINARY_PARSE", "ORDINARY_INSERT", "ORDINARY_LOGIN"):
+                        self.assertIn(marker, result.stdout)
+                    if target == "test-coverage":
+                        self.assertIn("PROPERTY_INCLUDED", result.stdout)
+                    else:
+                        self.assertNotIn("PROPERTY_INCLUDED", result.stdout)
+
+    def test_existing_static_analysis_is_preserved(self):
+        if "golang" in LANGUAGES:
+            text = (ROOT / "golang/Makefile").read_text()
+            self.assertIn("golangci-lint", text)
+            self.assertIn("check-lint", rules(text)["check"])
+        if "clojure" in LANGUAGES:
+            text = (ROOT / "clojure/Makefile").read_text()
+            self.assertIn("check-cljkondo", rules(text)["check"])
+
+    def test_go_cache_target_clears_actual_go_caches(self):
+        if "golang" not in LANGUAGES:
+            self.skipTest("Go lane only")
+        with scaffold("golang") as dest:
+            tools = dest / "fake-bin"
+            fake_tool(tools, "go", 'echo "$*" >> "$PWD/go.calls"')
+            env = dict(os.environ, PATH=f"{tools}:{os.environ['PATH']}")
+            result = run(["make", "-s", "clean-cache"], dest, env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = (dest / "go.calls").read_text() if (dest / "go.calls").exists() else ""
+            self.assertIn("clean", calls)
+            self.assertIn("-cache", calls)
+            self.assertIn("-testcache", calls)
+            self.assertNotIn("-modcache", calls)
+
     def test_required_templates(self):
         expected = {
             "python": (".env.example", ".coveragerc", "README.md", "Dockerfile", "fly.toml", "alembic.ini", "alembic/env.py", "src/python_scaffold/api.py"),

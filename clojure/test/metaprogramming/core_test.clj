@@ -4,5 +4,4 @@
 
 (deftest ^:unit example-test
   (testing "doubling"
-    (doseq [value [0 2 -3]]
-      (is (= (+ value value) (core/example value))))))
+    (doseq [value [0 2 -3]] (is (= (+ value value) (core/example value))))))
