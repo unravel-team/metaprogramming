@@ -4,17 +4,22 @@ __pycache__/
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.coverage
+coverage.xml
+coverage/
 
-# Virtual environments
-.venv
-
-# 12-factor apps
+# Virtual environments and local configuration
+.venv/
 .env
 
-# IDE
-.vscode
-.python-version
+# Tool caches
+.pytest_cache/
+.ruff_cache/
 
-# Aider
+# Local editor state
 .aider*
+
+# IDE
+.vscode/
+.python-version
