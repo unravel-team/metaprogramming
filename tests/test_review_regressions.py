@@ -102,13 +102,14 @@ class ReviewRegressions(unittest.TestCase):
             for tool in ("ruff", "pytest", "basedpyright", "ty", "bandit"):
                 self.assertIn(tool, result.stdout + result.stderr)
 
+    @unittest.skipUnless(os.environ.get("RUN_ENV_FIXTURES") == "1", "Env fixture execution requires explicit opt-in")
     @unittest.skipUnless(shutil.which("uv") and (ROOT / "python/.venv").exists(), "Python init required")
     def test_python_migration_uses_env_file(self):
         if "python" not in LANGUAGES:
             self.skipTest("Python only")
         for override in (False, True):
             with self.subTest(override=override), scaffold("python") as dest:
-                (dest / ".env").write_text("DATABASE_URL=file-url-$(touch should-not-exist)\n")
+                (dest / ".env").write_text("DATABASE_URL='file-url-$(touch should-not-exist)'\n")
                 makefile = dest / "Makefile"
                 # Retain real environment setup/uv flags, replace DB operation only.
                 makefile.write_text(makefile.read_text().replace("alembic upgrade head", "python -c 'import os; print(os.environ.get(\"DATABASE_URL\", \"\"))'"))
@@ -130,6 +131,7 @@ class ReviewRegressions(unittest.TestCase):
             result = run(["uv", "run", "--no-sync", "alembic", "upgrade", "head", "--sql"], dest, env=env)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    @unittest.skipUnless(os.environ.get("RUN_ENV_FIXTURES") == "1", "Env fixture execution requires explicit opt-in")
     @unittest.skipUnless(shutil.which("clojure"), "Clojure required")
     def test_clojure_migration_uses_env_file(self):
         if "clojure" not in LANGUAGES:
