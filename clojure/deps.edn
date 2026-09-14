@@ -1,7 +1,7 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}}
  :aliases
- {:test {:extra-paths ["test"]
+ {:test {:extra-paths ["test" "app"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}
                       org.clojure/test.check {:mvn/version "1.1.1"}}
@@ -28,9 +28,10 @@
          :main-opts ["-m" "polylith.clj.core.core"]}
 
   :coverage {:classpath-overrides {org.clojure/clojure nil}
+             :extra-paths ["scripts"]
              :extra-deps {com.github.flow-storm/clojure {:mvn/version "1.12.5"}
                           com.github.flow-storm/clofidence {:mvn/version "0.5.0"}}
-             :exec-fn clofidence.main/run
+             :exec-fn coverage-runner/run
              :exec-args {:report-name "metaprogramming"
                          :output-folder "coverage"
                          :test-fn cognitect.test-runner.api/test
@@ -52,4 +53,7 @@
                    :exec-fn deps-deploy.deps-deploy/deploy}
 
   :antq {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1276"}}
-         :main-opts ["-m" "antq.core"]}}}
+         :main-opts ["-m" "antq.core"]}
+
+  :sync-deps {:extra-paths ["scripts"]
+              :main-opts ["-m" "sync-deps-org"]}}}

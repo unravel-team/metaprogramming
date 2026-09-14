@@ -80,14 +80,16 @@ After =make init=, normal dependency checks do not mutate manifests or locks:
 | =python/=    | =uv lock --check= validates =uv.lock=. | =pip-audit=; network required. |
 | =typescript/=| frozen pnpm lock validation without install. | pnpm audit; network required, fails at low severity. |
 | =golang/=    | =go mod verify= and =go mod tidy -diff=. | project-local =govulncheck=; network required. |
-| =clojure/=   | =-Srepro= classpath resolution, not frozen/offline lock guarantee. | clj-watson; network and =CLJ_WATSON_NVD_API_KEY= required. |
+| =clojure/=   | =-Srepro= resolves base plus =:test=, =:run=, and =:migratus= classpaths; not frozen/offline. | clj-watson scans base plus =:migratus=; network and =CLJ_WATSON_NVD_API_KEY= required. |
 
 Each scaffold supplies PostgreSQL Compose template and migration target. Migration
 tools remain language-native: Alembic (Python), dbmate (TypeScript), Goose (Go),
 and Migratus (Clojure). After Python =make init=, both Alembic migration targets
 load =.env= through UV and an exported =DATABASE_URL= wins. =make migrate-create=
 creates a migration; Python's Alembic autogeneration also inspects the configured
-database. =make migrate= contacts that database. Treat both as explicit operations.
+database. =make migrate= contacts that database. Clojure Migratus uses exported =DATABASE_URL=
+first, otherwise a plain unquoted value from =.env= read as data without shell
+evaluation. Treat both as explicit operations.
 
 =make infra-up= starts local services; =make infra-down= stops them. =make
 infra-down-clean= warns about irreversible local data loss and removes volumes only

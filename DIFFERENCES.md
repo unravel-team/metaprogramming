@@ -14,7 +14,7 @@ language differences rather than hiding them behind a root wrapper.
 | Python | Python 3.12+, uv, tagref | Copies missing `.env`; `uv sync --locked`. | `uv lock --check` validates `uv.lock`. |
 | TypeScript | Node.js 22+, Corepack, tagref | Copies missing `.env`; `corepack pnpm install --frozen-lockfile`. | Frozen lockfile-only validation; neither installs nor changes lock. |
 | Go | Go 1.26+, tagref | Copies missing `.env`; downloads/verifies modules and installs pinned tools into `.tools/bin`. | `go mod verify` plus `go mod tidy -diff`; reports drift without rewriting metadata. |
-| Clojure | JDK 21+, Clojure CLI, tagref | Copies missing `.env`; prefetches pinned aliases. | `clojure -Srepro -Spath` resolves project classpath. No native Clojure lockfile means this is not an offline/frozen guarantee. |
+| Clojure | JDK 21+, Clojure CLI, tagref | Copies missing `.env`; prefetches pinned aliases. | `clojure -Srepro` resolves base plus `:test`, `:run`, and `:migratus` classpaths. No native Clojure lockfile means this is not an offline/frozen guarantee. |
 
 Docker Compose is needed for local PostgreSQL. Fly CLI is required only for Fly
 operations. Normal checks, tests, builds, development, and migrations do not
@@ -34,7 +34,7 @@ arbitrary coverage percentage.
 | Python | pytest with Hypothesis | UV lock, Ruff format/lint, Ty, BasedPyright, Bandit, tagref. | Terminal missing-lines report, `coverage.xml`, and HTML. Measures `src`; integration/LLM paths remain uncovered. |
 | TypeScript | Vitest with fast-check | Frozen pnpm validation, Biome, TypeScript, Knip, jscpd, tagref. | V8 terminal, LCOV, HTML under `coverage/`; includes unimported library/route source. Node Vitest does not render async Next server components, so dedicated integration coverage is needed there. |
 | Go | `go test` with Rapid | Module check, non-mutating gofmt, `go vet`, pinned `golangci-lint`, tagref. | Atomic profile, function summary, and HTML in `coverage/`; includes all packages and excludes only integration/LLM test prefixes. Unexecuted packages can be zero. |
-| Clojure | Cognitect runner with test.check | Reproducible classpath resolution, pinned zprint, pinned clj-kondo, tagref. | Clofidence HTML in `coverage/` for unit/property tests; instruments production namespaces and skips test namespaces. External paths remain uncovered. |
+| Clojure | Cognitect runner with test.check | Base plus test/run/Migratus classpath resolution, pinned zprint, pinned clj-kondo, tagref. | Clofidence HTML in `coverage/` for unit/property tests; includes tested `app/` production source, skips test namespaces, and rethrows runner failures after reporting. External paths remain uncovered. |
 
 Property-test failures shrink generated cases: Hypothesis, fast-check, Rapid, and
 test.check each provide their ecosystem's shrinking behavior.
@@ -50,7 +50,7 @@ combines check, default tests, and audit.
 | Python | `pip-audit` | Network access; advisories can fail target. |
 | TypeScript | `pnpm audit --audit-level=low` | Network access; low-or-higher findings fail target. |
 | Go | project-local `govulncheck` | `make init` and vulnerability database network access. |
-| Clojure | `clj-watson` with CVSS threshold zero | Network plus `CLJ_WATSON_NVD_API_KEY`; optional OSS Index is disabled unless project configures it. |
+| Clojure | `clj-watson` with CVSS threshold zero, scanning base plus `:migratus` | Network plus `CLJ_WATSON_NVD_API_KEY`; optional OSS Index is disabled unless project configures it. |
 
 ## Services, migrations, and local data
 
@@ -64,7 +64,7 @@ and requires a successful build; it is never part of normal verification or rele
 | Python | FastAPI/Uvicorn reload on port 8000 | Alembic | Migration targets load `.env` through UV; exported `DATABASE_URL` wins, otherwise Alembic uses its local default. |
 | TypeScript | Next development server on port 3000 | dbmate | `DATABASE_URL` uses `.env` defaults or exported override. |
 | Go | project-local Air on port 8080; reload builds only `tmp/main` | Goose | Exported `DATABASE_URL` wins; otherwise target reads a simple value from `.env` without executing it. |
-| Clojure | JVM HTTP server on port 8080 | Migratus | Requires externally supplied `DATABASE_URL`. |
+| Clojure | JVM HTTP server on port 8080 | Migratus | Exported `DATABASE_URL` wins; otherwise reads a plain unquoted value from `.env` as data, never shell code. |
 
 `migrate-create` creates migration files; Python's Alembic autogeneration also
 inspects the configured database. `migrate` contacts that database. `infra-down-clean` prints data-loss warning and removes volumes only for
@@ -109,7 +109,8 @@ Clojure keeps two optional workflow helpers because they express JVM/REPL needs:
 - `poly` is available for teams adopting Polylith, but guard rejects base scaffold
   until `workspace.edn` and components exist.
 
-`clojure.org` is source for generated Clojure workflow/config/source blocks. Tangle
-it and require byte-for-byte parity. Python has same literate parity requirement
+`clojure.org` is source for generated Clojure workflow/config/source blocks.
+`upgrade-deps` synchronizes its updated `deps.edn` into that source before tangling,
+which must remain byte-for-byte parity. Python has same literate parity requirement
 for `python.org`; version metadata intentionally remains outside generated blocks
 where needed so version bumps survive tangling.
