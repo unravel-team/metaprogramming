@@ -34,8 +34,11 @@ init: ## Copy .env when absent and prefetch pinned project dependencies
 	@$(CLOJURE) -P -M:clj-watson
 	@$(CLOJURE) -P -X:deploy-clojars
 
-check-deps: ## Resolve reproducible project classpath; Clojure CLI has no native lockfile
+check-deps: ## Resolve base, test, run, and Migratus classpaths; Clojure CLI has no native lockfile
 	@$(CLOJURE) -Spath >/dev/null
+	@$(CLOJURE) -A:test -Spath >/dev/null
+	@$(CLOJURE) -A:run -Spath >/dev/null
+	@$(CLOJURE) -A:migratus -Spath >/dev/null
 
 check-format: ## Check Clojure formatting with pinned zprint without rewriting files
 	@$(CLOJURE) -M:zprint -c $(CLOJURE_SOURCES)
@@ -48,9 +51,9 @@ check-tagref: ## Validate documented cross-file references
 
 check: check-deps check-format check-cljkondo check-tagref ## Run reproducible dependency, format, lint, and reference checks
 
-audit-deps: ## Scan dependency advisories; network and CLJ_WATSON_NVD_API_KEY required
+audit-deps: ## Scan base and :migratus advisories; network and CLJ_WATSON_NVD_API_KEY required
 	@test -n "$${CLJ_WATSON_NVD_API_KEY:-}" || { echo "CLJ_WATSON_NVD_API_KEY is required for a reliable NVD scan."; exit 2; }
-	@CLJ_WATSON_ANALYZER_OSSINDEX_ENABLED=false $(CLOJURE) -M:clj-watson scan -p deps.edn --cvss-fail-threshold 0
+	@CLJ_WATSON_ANALYZER_OSSINDEX_ENABLED=false $(CLOJURE) -M:clj-watson scan -p deps.edn -a migratus --cvss-fail-threshold 0
 
 format: ## Apply pinned zprint formatting to Clojure source and tests
 	@$(CLOJURE) -M:zprint -w $(CLOJURE_SOURCES)
@@ -107,7 +110,7 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for exa
 	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
 	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
 
-migrate: ## Apply Migratus migrations using externally supplied DATABASE_URL
+migrate: ## Apply Migratus migrations using exported or plain .env DATABASE_URL
 	@$(CLOJURE) -M:migratus -m migratus-run migrate
 
 migrate-create: ## Create Migratus migration files; use NAME='describe change'
@@ -157,8 +160,9 @@ release: ## Validate then locally annotate clean standalone HEAD with current ve
 	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
 	git tag --annotate "$$tag" --message "Release $$tag"
 
-upgrade-deps: ## Deliberately update deps.edn constraints; no native Clojure lockfile exists
+upgrade-deps: ## Update deps.edn constraints and synchronize canonical Org source
 	@$(CLOJURE) -M:antq --upgrade
+	@$(CLOJURE) -M:sync-deps
 
 repl: ## Start a reproducible Clojure REPL with project source paths
 	@$(CLOJURE) -M

@@ -33,12 +33,13 @@
 
 ## Build/Test Commands
 
+- Setup copied scaffold: `make init`
 - Build: `make build`
-- Install locally: `make install`
-- Run all tests: `make test`
+- Default unit/property tests: `make test`
+- Full test categories: `make test-all`
 - Full check: `make check` (runs linters and formatting checks)
-- Single test: `clojure -X:test :only your.test.ns/test-name`
-- Format the code: `make format`. Uses zprint for formatting.
+- Single test: `clojure -Srepro -X:test :vars '[your.test.ns/test-name]'`
+- Format the code: `make format`. Uses pinned zprint alias.
 
 ## Dependencies and Code Style
 

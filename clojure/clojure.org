@@ -19,8 +19,8 @@ and Fly CLI only for deployment. =make init= copies =.env.example= only when
 host runtimes. Normal Clojure commands use =-Srepro= so global user aliases
 cannot change project behavior, but native CLI resolution can still access cache
 or network when a dependency is absent. Clojure CLI has no native lockfile, so
-=make check-deps= verifies reproducible classpath resolution rather than a frozen
-or offline guarantee.
+=make check-deps= resolves base plus =:test=, =:run=, and =:migratus=
+operational classpaths rather than providing a frozen or offline guarantee.
 
 ** Tests, coverage, and optional tooling
 
@@ -28,8 +28,9 @@ Cognitect test-runner metadata selectors distinguish =^:unit=, =^:property=,
 =^:integration=, and =^:llm=. Default test runs unit and property targets only.
 Pinned JVM clj-kondo analyses source, tests, scripts, and build metadata.
 Clofidence uses its compiler override in isolated coverage alias, instruments
-=metaprogramming= production namespaces, skips test namespaces, and writes its
-report under =coverage/=. Polylith remains a pinned optional alias, but this base
+=metaprogramming= production namespaces, skips test namespaces, includes the
+runnable =app/= path, and writes its report under =coverage/=. Its wrapper saves
+the report before rethrowing test-runner failures. Polylith remains a pinned optional alias, but this base
 scaffold has no workspace; its Make target stops with actionable guidance.
 
 ** Safety boundaries
@@ -37,8 +38,9 @@ scaffold has no workspace; its Make target stops with actionable guidance.
 Build creates a library JAR from =src/= only, never local Maven installation.
 Runnable Fly code stays under =app/= and the Docker ignore file excludes local
 artifacts and environment files. Migratus persists migrations in project
-configuration and requires externally supplied database URL only when applying
-migrations. clj-watson audit requires network and NVD API credentials and fails
+configuration and, when applying migrations, uses exported =DATABASE_URL= or a
+plain unquoted value from =.env= read as data. clj-watson audits base and
+=:migratus= dependencies, requires network and NVD API credentials, and fails
 on results. Release and Clojars publication require clean standalone Git root,
 exact annotated local version tag, and explicit identities/credentials. Build
 metadata computes the library artifact and POM paths so customized library names
@@ -86,8 +88,11 @@ init: ## Copy .env when absent and prefetch pinned project dependencies
 	@$(CLOJURE) -P -M:clj-watson
 	@$(CLOJURE) -P -X:deploy-clojars
 
-check-deps: ## Resolve reproducible project classpath; Clojure CLI has no native lockfile
+check-deps: ## Resolve base, test, run, and Migratus classpaths; Clojure CLI has no native lockfile
 	@$(CLOJURE) -Spath >/dev/null
+	@$(CLOJURE) -A:test -Spath >/dev/null
+	@$(CLOJURE) -A:run -Spath >/dev/null
+	@$(CLOJURE) -A:migratus -Spath >/dev/null
 
 check-format: ## Check Clojure formatting with pinned zprint without rewriting files
 	@$(CLOJURE) -M:zprint -c $(CLOJURE_SOURCES)
@@ -100,9 +105,9 @@ check-tagref: ## Validate documented cross-file references
 
 check: check-deps check-format check-cljkondo check-tagref ## Run reproducible dependency, format, lint, and reference checks
 
-audit-deps: ## Scan dependency advisories; network and CLJ_WATSON_NVD_API_KEY required
+audit-deps: ## Scan base and :migratus advisories; network and CLJ_WATSON_NVD_API_KEY required
 	@test -n "$${CLJ_WATSON_NVD_API_KEY:-}" || { echo "CLJ_WATSON_NVD_API_KEY is required for a reliable NVD scan."; exit 2; }
-	@CLJ_WATSON_ANALYZER_OSSINDEX_ENABLED=false $(CLOJURE) -M:clj-watson scan -p deps.edn --cvss-fail-threshold 0
+	@CLJ_WATSON_ANALYZER_OSSINDEX_ENABLED=false $(CLOJURE) -M:clj-watson scan -p deps.edn -a migratus --cvss-fail-threshold 0
 
 format: ## Apply pinned zprint formatting to Clojure source and tests
 	@$(CLOJURE) -M:zprint -w $(CLOJURE_SOURCES)
@@ -159,7 +164,7 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for exa
 	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
 	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
 
-migrate: ## Apply Migratus migrations using externally supplied DATABASE_URL
+migrate: ## Apply Migratus migrations using exported or plain .env DATABASE_URL
 	@$(CLOJURE) -M:migratus -m migratus-run migrate
 
 migrate-create: ## Create Migratus migration files; use NAME='describe change'
@@ -209,8 +214,9 @@ release: ## Validate then locally annotate clean standalone HEAD with current ve
 	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
 	git tag --annotate "$$tag" --message "Release $$tag"
 
-upgrade-deps: ## Deliberately update deps.edn constraints; no native Clojure lockfile exists
+upgrade-deps: ## Update deps.edn constraints and synchronize canonical Org source
 	@$(CLOJURE) -M:antq --upgrade
+	@$(CLOJURE) -M:sync-deps
 
 repl: ## Start a reproducible Clojure REPL with project source paths
 	@$(CLOJURE) -M
@@ -231,7 +237,7 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}}
  :aliases
- {:test {:extra-paths ["test"]
+ {:test {:extra-paths ["test" "app"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}
                       org.clojure/test.check {:mvn/version "1.1.1"}}
@@ -258,9 +264,10 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
          :main-opts ["-m" "polylith.clj.core.core"]}
 
   :coverage {:classpath-overrides {org.clojure/clojure nil}
+             :extra-paths ["scripts"]
              :extra-deps {com.github.flow-storm/clojure {:mvn/version "1.12.5"}
                           com.github.flow-storm/clofidence {:mvn/version "0.5.0"}}
-             :exec-fn clofidence.main/run
+             :exec-fn coverage-runner/run
              :exec-args {:report-name "metaprogramming"
                          :output-folder "coverage"
                          :test-fn cognitect.test-runner.api/test
@@ -282,7 +289,10 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
                    :exec-fn deps-deploy.deps-deploy/deploy}
 
   :antq {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1276"}}
-         :main-opts ["-m" "antq.core"]}}}
+         :main-opts ["-m" "antq.core"]}
+
+  :sync-deps {:extra-paths ["scripts"]
+              :main-opts ["-m" "sync-deps-org"]}}}
 #+end_src
 ** build.clj
 
@@ -355,16 +365,21 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
     (respond! exchange 200 "{\"status\":\"ok\"}")
     (respond! exchange 404 "{\"error\":\"not found\"}")))
 
-(defn -main
-  []
-  (let [port (Integer/parseInt (or (System/getenv "PORT") "8080"))
-        server (HttpServer/create (InetSocketAddress. "0.0.0.0" port) 0)]
+(defn start!
+  [port]
+  (let [server (HttpServer/create (InetSocketAddress. "0.0.0.0" port) 0)]
     (.createContext server
                     "/"
                     (reify
                       HttpHandler
                         (handle [_ exchange] (handler exchange))))
     (.start server)
+    server))
+
+(defn -main
+  []
+  (let [port (Integer/parseInt (or (System/getenv "PORT") "8080"))]
+    (start! port)
     (println (str "Clojure scaffold listening on 0.0.0.0:" port)))) ; [tag:health-route]
 #+end_src
 ** scripts/migratus_run.clj
@@ -372,13 +387,35 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
 #+begin_src clojure :tangle "scripts/migratus_run.clj"
 (ns migratus-run
   (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clojure.string :as str]
             [migratus.core :as migratus]))
 
 (defn- config [] (edn/read-string (slurp "migratus.edn")))
 
+(defn- env-file-value
+  [name]
+  (let [env-file (io/file ".env")]
+    (when (.isFile env-file)
+      (with-open [reader (io/reader env-file)]
+        (some (fn [line]
+                (let [[key value] (str/split line #"=" 2)]
+                  (when (= name (str/trim key))
+                    (some-> value
+                            str/trim
+                            not-empty))))
+              (line-seq reader))))))
+
+(defn- database-url
+  []
+  (let [environment (System/getenv)]
+    (if (.containsKey environment "DATABASE_URL")
+      (.get environment "DATABASE_URL")
+      (env-file-value "DATABASE_URL"))))
+
 (defn- database-config
   []
-  (let [database-url (System/getenv "DATABASE_URL")]
+  (let [database-url (database-url)]
     (when-not (seq database-url)
       (throw (ex-info "DATABASE_URL is required to apply migrations." {})))
     (assoc (config) :db {:connection-uri database-url})))
@@ -390,6 +427,71 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
     "create" (migratus/create (config) (first args))
     (throw (ex-info "Expected migrate or create command."
                     {:command command, :args args}))))
+#+end_src
+** scripts/coverage_runner.clj
+
+#+begin_src clojure :tangle "scripts/coverage_runner.clj"
+(ns coverage-runner
+  (:require [clofidence.main :as clofidence]
+            [clofidence.report-renderer :as renderer]
+            [cognitect.test-runner.api :as test-runner]))
+
+(def ^:dynamic *test-failure* nil)
+
+(defn run-tests
+  [opts]
+  (try (test-runner/test opts)
+       (catch Throwable error (reset! *test-failure* error))))
+
+(defn- report-and-save
+  [coords-cov forms opts]
+  (let [total-hits (#'clofidence/total-coords-hits coords-cov)]
+    (if (zero? total-hits)
+      (println
+        "\n\n Nothing recorded, so no report will be generated. Did you setup clojure.storm.instrumentOnlyPrefixes correctly?")
+      (do (println
+            (format
+              "Captured a total of %d forms coordinates hits for %d forms."
+              total-hits
+              (count coords-cov)))
+          (println "Building and saving report...")
+          (let [report (#'clofidence/make-report forms coords-cov)
+                report-index-html (renderer/render-index-html report opts)
+                namespace-reports (renderer/render-namespaces-details-reports
+                                    report)]
+            (#'clofidence/save report-index-html namespace-reports opts))
+          (println "All done")))))
+
+(defn run
+  [opts]
+  (let [test-failure (atom nil)]
+    (binding [*test-failure* test-failure]
+      (with-redefs [clofidence/report-and-save report-and-save]
+        (clofidence/run (assoc opts :test-fn `run-tests))))
+    (when-let [error @test-failure] (throw error))))
+#+end_src
+** scripts/sync_deps_org.clj
+
+#+begin_src clojure :tangle "scripts/sync_deps_org.clj"
+(ns sync-deps-org
+  (:require [clojure.java.io :as io]))
+
+(def ^:private source-block "#+begin_src clojure :tangle \"deps.edn\"")
+
+(defn- synchronize
+  [org dependencies]
+  (let [block-start (.indexOf org source-block)
+        content-start (+ block-start (count source-block))
+        block-end (.indexOf org "#+end_src" content-start)]
+    (when (or (neg? block-start) (neg? block-end))
+      (throw (ex-info "Could not find the deps.edn Org source block." {})))
+    (str (subs org 0 (inc content-start)) dependencies (subs org block-end))))
+
+(defn -main
+  []
+  (let [org-file (io/file "clojure.org")
+        deps-file (io/file "deps.edn")]
+    (spit org-file (synchronize (slurp org-file) (slurp deps-file)))))
 #+end_src
 ** scripts/release.sh
 
@@ -523,7 +625,7 @@ volumes:
 ** .env.example
 
 #+begin_src conf :tangle ".env.example"
-# JDBC URL for make migrate; Compose uses matching local defaults.
+# Plain JDBC URL fallback for make migrate; exported DATABASE_URL wins.
 DATABASE_URL=jdbc:postgresql://localhost:5432/clojure_scaffold?user=clojure_scaffold&password=change-me
 PORT=8080
 #+end_src
@@ -573,25 +675,30 @@ Clojure CLI has no native lockfile. Every normal Clojure command uses `-Srepro`,
 which ignores user-level aliases and resolves only checked-in project metadata.
 `make init` explicitly prefetches pinned aliases; runtime CLI commands still use
 native implicit cache/network resolution when a dependency is absent. Therefore
-`make check-deps` verifies reproducible project-classpath resolution, not a
-frozen or offline lock guarantee. `make upgrade-deps` is deliberate metadata
-maintenance.
+`make check-deps` resolves the base classpath plus `:test`, `:run`, and
+`:migratus` operational aliases; it is not a frozen or offline lock guarantee.
+`make upgrade-deps` is deliberate metadata maintenance and synchronizes its
+updated `deps.edn` into the canonical Org block so future tangling preserves it.
 
 ## Checks, tests, and coverage
 
 `make check` runs reproducible dependency resolution, pinned zprint checking,
-pinned JVM clj-kondo analysis, and tag references. `make format` uses the `:zprint` alias, never macOS
-`/usr/bin/zprint`. Default `make test` runs `^:unit` and `^:property` tests.
+pinned JVM clj-kondo analysis, and tag references. `make format` uses the `:zprint`
+alias, never macOS `/usr/bin/zprint`; no project editor configuration invokes a bare
+formatter, so editors need optional user configuration. Default `make test` runs
+`^:unit` and `^:property` tests.
 Property tests use `test.check`; failing generated cases shrink automatically.
 `make test-integration` and `make test-llm` invoke Cognitect metadata selectors;
 an empty selector succeeds under Cognitect test-runner policy. `make test-all`
 runs every test category.
 
 `make test-coverage` runs unit and property tests through Clofidence and writes
-HTML coverage to `coverage/`. Clofidence instruments production namespaces under
-`metaprogramming` and skips test namespaces. Coverage is diagnostic: no arbitrary
-percentage gate. Integration and LLM paths remain uncovered until those external
-systems are supplied.
+HTML coverage to `coverage/`. Its test classpath includes the runnable `app/` code,
+so the report includes `metaprogramming.server` as well as library namespaces.
+Clofidence instruments production namespaces under `metaprogramming`, skips test
+namespaces, and its wrapper rethrows test-runner failures after saving a report.
+Coverage is diagnostic: no arbitrary percentage gate. Integration and LLM paths
+remain uncovered until those external systems are supplied.
 
 `make build` waits for `check` and default tests, then creates a library JAR in
 `target/`; it never installs into local Maven. Only `src/` enters that JAR. The
@@ -601,14 +708,16 @@ runnable Fly HTTP app is in `app/`, binds `0.0.0.0:8080`, and exposes
 ## Database, audit, release, and deployment
 
 `compose.yaml` provides PostgreSQL with a named volume. `make migrate` applies
-real Migratus migrations and requires `DATABASE_URL`; `make migrate-create
-NAME='add widgets'` creates migration files without contacting a database.
+real Migratus migrations using exported `DATABASE_URL` first, otherwise a plain,
+unquoted `DATABASE_URL=value` from `.env`; the file is read as data and never
+shell-evaluated. `make migrate-create NAME='add widgets'` creates migration files
+without contacting a database.
 `make infra-down-clean` always prompts and removes volumes only after exact
 `yes`.
 
-`make audit-deps` runs clj-watson with `--cvss-fail-threshold 0`, so reported
-vulnerabilities fail the target. It requires network access and
-`CLJ_WATSON_NVD_API_KEY`; optional OSS Index analysis is explicitly disabled
+`make audit-deps` runs clj-watson against base dependencies plus the `:migratus`
+alias with `--cvss-fail-threshold 0`, so reported vulnerabilities fail the target.
+It requires network access and `CLJ_WATSON_NVD_API_KEY`; optional OSS Index analysis is explicitly disabled
 unless a project chooses to configure credentials. `make ci` includes this
 networked audit after offline checks and default tests.
 
@@ -629,8 +738,8 @@ and launches that enriched REPL; no global user aliases are assumed.
 
 `clojure.org` is source of generated workflow, config, and source files. After
 editing its blocks, run Org Babel tangle and require byte-for-byte parity before
-committing. `VERSION` is intentionally outside Org so version bumps survive
-tangling.
+committing. `upgrade-deps` updates its `deps.edn` block before the next tangle.
+`VERSION` is intentionally outside Org so version bumps survive tangling.
 #+end_src
 ** AGENTS.md
 

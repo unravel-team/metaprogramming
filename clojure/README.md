@@ -11,25 +11,30 @@ Clojure CLI has no native lockfile. Every normal Clojure command uses `-Srepro`,
 which ignores user-level aliases and resolves only checked-in project metadata.
 `make init` explicitly prefetches pinned aliases; runtime CLI commands still use
 native implicit cache/network resolution when a dependency is absent. Therefore
-`make check-deps` verifies reproducible project-classpath resolution, not a
-frozen or offline lock guarantee. `make upgrade-deps` is deliberate metadata
-maintenance.
+`make check-deps` resolves the base classpath plus `:test`, `:run`, and
+`:migratus` operational aliases; it is not a frozen or offline lock guarantee.
+`make upgrade-deps` is deliberate metadata maintenance and synchronizes its
+updated `deps.edn` into the canonical Org block so future tangling preserves it.
 
 ## Checks, tests, and coverage
 
 `make check` runs reproducible dependency resolution, pinned zprint checking,
-pinned JVM clj-kondo analysis, and tag references. `make format` uses the `:zprint` alias, never macOS
-`/usr/bin/zprint`. Default `make test` runs `^:unit` and `^:property` tests.
+pinned JVM clj-kondo analysis, and tag references. `make format` uses the `:zprint`
+alias, never macOS `/usr/bin/zprint`; no project editor configuration invokes a bare
+formatter, so editors need optional user configuration. Default `make test` runs
+`^:unit` and `^:property` tests.
 Property tests use `test.check`; failing generated cases shrink automatically.
 `make test-integration` and `make test-llm` invoke Cognitect metadata selectors;
 an empty selector succeeds under Cognitect test-runner policy. `make test-all`
 runs every test category.
 
 `make test-coverage` runs unit and property tests through Clofidence and writes
-HTML coverage to `coverage/`. Clofidence instruments production namespaces under
-`metaprogramming` and skips test namespaces. Coverage is diagnostic: no arbitrary
-percentage gate. Integration and LLM paths remain uncovered until those external
-systems are supplied.
+HTML coverage to `coverage/`. Its test classpath includes the runnable `app/` code,
+so the report includes `metaprogramming.server` as well as library namespaces.
+Clofidence instruments production namespaces under `metaprogramming`, skips test
+namespaces, and its wrapper rethrows test-runner failures after saving a report.
+Coverage is diagnostic: no arbitrary percentage gate. Integration and LLM paths
+remain uncovered until those external systems are supplied.
 
 `make build` waits for `check` and default tests, then creates a library JAR in
 `target/`; it never installs into local Maven. Only `src/` enters that JAR. The
@@ -39,14 +44,16 @@ runnable Fly HTTP app is in `app/`, binds `0.0.0.0:8080`, and exposes
 ## Database, audit, release, and deployment
 
 `compose.yaml` provides PostgreSQL with a named volume. `make migrate` applies
-real Migratus migrations and requires `DATABASE_URL`; `make migrate-create
-NAME='add widgets'` creates migration files without contacting a database.
+real Migratus migrations using exported `DATABASE_URL` first, otherwise a plain,
+unquoted `DATABASE_URL=value` from `.env`; the file is read as data and never
+shell-evaluated. `make migrate-create NAME='add widgets'` creates migration files
+without contacting a database.
 `make infra-down-clean` always prompts and removes volumes only after exact
 `yes`.
 
-`make audit-deps` runs clj-watson with `--cvss-fail-threshold 0`, so reported
-vulnerabilities fail the target. It requires network access and
-`CLJ_WATSON_NVD_API_KEY`; optional OSS Index analysis is explicitly disabled
+`make audit-deps` runs clj-watson against base dependencies plus the `:migratus`
+alias with `--cvss-fail-threshold 0`, so reported vulnerabilities fail the target.
+It requires network access and `CLJ_WATSON_NVD_API_KEY`; optional OSS Index analysis is explicitly disabled
 unless a project chooses to configure credentials. `make ci` includes this
 networked audit after offline checks and default tests.
 
@@ -67,5 +74,5 @@ and launches that enriched REPL; no global user aliases are assumed.
 
 `clojure.org` is source of generated workflow, config, and source files. After
 editing its blocks, run Org Babel tangle and require byte-for-byte parity before
-committing. `VERSION` is intentionally outside Org so version bumps survive
-tangling.
+committing. `upgrade-deps` updates its `deps.edn` block before the next tangle.
+`VERSION` is intentionally outside Org so version bumps survive tangling.
