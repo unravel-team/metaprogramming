@@ -1,84 +1,149 @@
-#+title:  Metaprogramming Conventions
+#+title: Metaprogramming Language Scaffolds
 #+author: Vedang Manerikar
 #+email: vedang@unravel.tech
 #+language: en
 #+options: ':t toc:nil num:nil author:t email:t
 
-* Quickstart
+* Standalone language scaffolds
 
-1. Copy language folder (clojure, golang, python, or typescript) to your project
-2. =make doctor= -- verify toolchain
-3. =make init= -- bootstrap dependencies (includes git hooks)
+Each language folder is complete starting point for one service and library. Copy
+one folder into its own Git repository before customization. Scaffolds do not
+coordinate through root Makefile or hidden bootstrap scripts.
 
-* Recommended Tools
+Choose one of =clojure/=, =golang/=, =python/=, or =typescript/=. Then replace
+placeholder package/library and Fly app identities before releasing or deploying.
+Read copied folder's =README.md= for language-specific details.
 
-Optional tooling configurations that can improve your development experience are available in the [[file:recommended-tools/][recommended-tools/]] folder. These are not required to build or test the project.
+* Setup
 
-Examples include:
+Install host runtime and package manager first; scaffold setup never installs host
+tools. Docker Compose supports local PostgreSQL, =tagref= supports reference
+checking, and Fly CLI is needed only for Fly deployment.
 
-- =direnv= -- Automatic environment variable loading when entering project directories
+| Folder       | Host prerequisites                                  | Project setup installed by =make init=             |
+|--------------+-----------------------------------------------------+----------------------------------------------------|
+| =python/=    | Python 3.12+, =uv=, =tagref=                        | locked Python dependencies                         |
+| =typescript/=| Node.js 22+, Corepack, =tagref=                     | locked pnpm dependencies                           |
+| =golang/=    | Go 1.24+, =tagref=                                  | modules; pinned local Air, Goose, audit, lint tools|
+| =clojure/=   | JDK 21+, Clojure CLI, =tagref=                      | pinned Clojure aliases                             |
 
-See [[file:recommended-tools/README.md][recommended-tools/README.md]] for details.
+In copied scaffold:
 
-* Common Make Targets
+#+begin_src sh
+make doctor
+make init
+make check test
+make build
+#+end_src
 
-| Target   | Purpose                 |
-|----------+-------------------------|
-| =help=   | Show available commands |
-| =doctor= | Verify required tools   |
-| =init=   | Bootstrap setup         |
-| =check=  | Run static analysis     |
-| =format= | Apply formatting        |
-| =test=   | Run tests               |
-| =build=  | Create artifact         |
+=make init= is only normal setup entry point. It copies =.env.example= to =.env=
+only when absent, then installs or prefetches checked-in dependencies as needed.
+Normal =check=, =test=, =build=, =dev=, and migration targets never invoke setup
+installers or deliberately update manifests/locks. Native dependency resolvers may
+still fetch missing cached dependencies; Clojure has no frozen/offline guarantee. Use =make upgrade-deps= for deliberate dependency
+maintenance and review resulting metadata and lock changes.
 
-* Language-Specific Conventions
+* Common workflow
 
-** Clojure
+| Target                 | Meaning |
+|------------------------+---------|
+| =help= / =doctor=      | List targets / diagnose host and project tools. |
+| =check=                | Dependency consistency plus format, static, and reference checks. |
+| =format=               | Apply language formatter. |
+| =test=                 | Default unit and property suites. |
+| =test-unit= / =test-property= | Run one default test category. |
+| =test-integration= / =test-llm= | Run explicit optional external category. |
+| =test-all=             | Run every test category. |
+| =test-coverage=        | Write coverage separately from normal tests. |
+| =build=                | Wait for =check= and default =test= before artifact creation; gates may run concurrently. |
+| =audit-deps=           | Networked advisory scan, separate from offline checks. |
+| =ci=                   | Run =check=, default =test=, and =audit-deps=. |
+| =clean= / =clean-cache=| Remove generated artifacts / language-specific caches. |
 
-Tools: clojure CLI, clj-kondo, zprint, tagref
+Property suites use Hypothesis (Python), fast-check (TypeScript), Rapid (Go), or
+test.check (Clojure). Generated failures shrink to small counterexamples. Optional
+integration and LLM targets invoke their real runners; their documented empty-suite
+policy does not turn a runner failure into success.
 
-Targets: =install=, =repl=, =check= (tagref + clj-kondo + zprint)
+Coverage has no arbitrary percentage gate. Reports show unexecuted production code
+where tool supports it, while external integration/LLM paths remain uncovered until
+those systems exist. TypeScript V8 coverage does not render async Next server
+components in its Node test environment; use dedicated integration coverage for
+those paths.
 
-See [[file:clojure/clojure.org][clojure/clojure.org]]
+* Dependency, database, and infrastructure policy
 
-** Golang
+After =make init=, normal dependency checks do not mutate manifests or locks:
 
-Tools: go, gofumpt, golangci-lint, gotestsum, tagref
+| Folder       | =check-deps= guarantee | =audit-deps= |
+|--------------+------------------------+--------------|
+| =python/=    | =uv lock --check= validates =uv.lock=. | =pip-audit=; network required. |
+| =typescript/=| frozen pnpm lock validation without install. | pnpm audit; network required, fails at low severity. |
+| =golang/=    | =go mod verify= and =go mod tidy -diff=. | project-local =govulncheck=; network required. |
+| =clojure/=   | =-Srepro= classpath resolution, not frozen/offline lock guarantee. | clj-watson; network and =CLJ_WATSON_NVD_API_KEY= required. |
 
-Targets: =sync=, =install-dev-tools=, =check= (golangci-lint + tagref)
+Each scaffold supplies PostgreSQL Compose template and migration target. Migration
+tools remain language-native: Alembic (Python), dbmate (TypeScript), Goose (Go),
+and Migratus (Clojure). =make migrate-create= creates a migration; Python's
+Alembic autogeneration also inspects the configured database. =make migrate=
+contacts that database. Treat both as explicit operations.
 
-Structure: =cmd/=, =internal/=, =bin/=
+=make infra-up= starts local services; =make infra-down= stops them. =make
+infra-down-clean= warns about irreversible local data loss and removes volumes only
+after exact =yes=. EOF, refusal, and every other response preserve volumes.
 
-** Python
+* Development, Fly, and artifacts
 
-Tools: python3, uv, ruff, pytest, basedpyright, bandit, tagref
+| Folder       | Development service | Build artifact |
+|--------------+---------------------+----------------|
+| =python/=    | FastAPI reload, port 8000 | wheel and source distribution |
+| =typescript/=| Next development server, port 3000 | Next app plus separate =dist/= library output |
+| =golang/=    | project-local Air, port 8080 | =bin/golang= Fly application binary |
+| =clojure/=   | JVM HTTP server, port 8080 | library JAR in =target/= |
 
-Targets: =venv=, =install-dev-tools=, =check= (ruff + basedpyright + bandit + tagref)
+All deployed containers bind =0.0.0.0:8080= and expose =GET /health=. =make
+deploy= builds locally, rejects placeholder Fly app identity, then calls Fly. No
+normal verification, release, or publication target deploys automatically.
 
-Structure: =src/<package>/=, =tests/=
+* Version, release, and publication
 
-See [[file:python/python.org][python/python.org]]
+=make version= prints semantic version. =make major=, =make minor=, and =make
+patch= change version metadata only, using normal semver reset rules. They never
+commit, tag, push, or change branches. Go v2+ bumps additionally require matching
+=/vN= module import path.
 
-** TypeScript
+=make release= validates and builds clean, committed, standalone repository, then
+creates local annotated =vVERSION= tag. It refuses nested template folder, so a
+copied scaffold cannot tag containing repository by mistake.
 
-Tools: bun, node, tagref
+Publishing is explicit and credential-guarded:
 
-Targets: =install=, =check= (Biome + tsc), =test= (Vitest), =build= (tsc)
+| Folder       | Target | Publication behavior |
+|--------------+--------+----------------------|
+| =python/=    | =deploy-pypi= | Publish current wheel and source distribution with =UV_PUBLISH_TOKEN=. |
+| =typescript/=| =deploy-npm= | Publish library files with =NPM_TOKEN= through restrictive temporary npm config. |
+| =golang/=    | =deploy-go= | Push current release tag to =origin= for module discovery; no central upload. |
+| =clojure/=   | =deploy-clojars= | Publish current JAR/POM with Clojars credentials. |
 
-Structure: =src/=, =tests/=
+Every publication target requires unique identity, clean standalone exact-HEAD
+annotated release tag, and its credentials. None run as part of =release= or =ci=.
 
-* Workflow
+* Cache behavior
 
-=make doctor= → =make init= → =make test= → =make check= → =make build=
+=make clean= removes generated artifacts. Use =make clean-cache= only when
+troubleshooting language caches:
 
-* Extending
+- Python removes project test/lint coverage caches and UV download cache.
+- TypeScript removes project Next and tool caches, not dependencies.
+- Go clears build and test caches with =go clean -cache -testcache=, preserving
+  downloaded module cache; these Go caches can be shared by local projects.
+- Clojure removes project CLI and linter caches, preserving global Maven cache.
 
-**Add language:** Create folder, add Makefile with 7 targets, document toolchain
+* Recommended tools
 
-**Add target:** Document here, add to all Makefiles
-
-**Modify tools:** Document rationale, update =doctor= target
+Optional editor and environment configuration lives in
+[[file:recommended-tools/][recommended-tools/]]. It is not required for scaffold
+setup, building, or testing.
 
 # Local Variables:
 # eval: (toc-org-mode 1)
