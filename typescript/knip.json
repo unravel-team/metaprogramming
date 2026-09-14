@@ -1,15 +1,18 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/index.ts"],
-  "project": ["tsconfig.json"],
-  "ignore": [
-    "**/*.config.*",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "node_modules/**",
-    "dist/**",
-    "build/**",
-    ".svelte-kit/**",
-    "coverage/**"
-  ]
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/index.ts",
+    "scripts/release.mjs",
+    "vitest.unit.config.ts",
+    "vitest.property.config.ts",
+    "vitest.integration.config.ts",
+    "vitest.llm.config.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs",
+    "*.config.ts"
+  ],
+  "ignoreDependencies": ["@biomejs/biome", "dbmate", "jscpd"]
 }
