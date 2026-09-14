@@ -61,7 +61,7 @@ and requires a successful build; it is never part of normal verification or rele
 
 | Language | Development command | Migration tool | Environment behavior |
 |---|---|---|---|
-| Python | FastAPI/Uvicorn reload on port 8000 | Alembic | Alembic reads `DATABASE_URL` or its local configuration default. |
+| Python | FastAPI/Uvicorn reload on port 8000 | Alembic | Migration targets load `.env` through UV; exported `DATABASE_URL` wins, otherwise Alembic uses its local default. |
 | TypeScript | Next development server on port 3000 | dbmate | `DATABASE_URL` uses `.env` defaults or exported override. |
 | Go | project-local Air on port 8080; reload builds only `tmp/main` | Goose | Exported `DATABASE_URL` wins; otherwise target reads a simple value from `.env` without executing it. |
 | Clojure | JVM HTTP server on port 8080 | Migratus | Requires externally supplied `DATABASE_URL`. |
@@ -91,7 +91,7 @@ folder.
 
 | Language | Metadata and special guard | Explicit publish target |
 |---|---|---|
-| Python | Project version and lock/literate version metadata stay synchronized. | `deploy-pypi`: needs unique package name, `UV_PUBLISH_TOKEN`, and current exact-HEAD annotated tag; rebuilds current wheel/source distribution. |
+| Python | Project version and lock/literate version metadata stay synchronized. | `deploy-pypi`: needs PEP 503-unique package name, `UV_PUBLISH_TOKEN`, and current exact-HEAD annotated tag; rebuilds current wheel/source distribution. |
 | TypeScript | `package.json` version. | `deploy-npm`: needs unique package name, `NPM_TOKEN`, and current exact-HEAD annotated tag; temporary restrictive npm config supplies registry credential. |
 | Go | `VERSION`; v2+ version requires matching `/vN` module path. | `deploy-go`: needs non-placeholder public module, `origin`, credentials, and current tag; pushes tag for module discovery rather than uploading registry artifact. |
 | Clojure | `VERSION` with build-derived library identity. | `deploy-clojars`: needs unique `build.clj` library, Clojars credentials, current tag, JAR, and POM. |
