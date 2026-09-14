@@ -26,11 +26,19 @@ installs packages. `make doctor` diagnoses host and project-local requirements.
 
 `src/app/page.tsx` and `src/app/layout.tsx` provide the default Next.js App
 Router application. `GET /health` returns `{ "status": "ok" }`
-[ref:health-route]. `src/index.ts` remains separate library API; `make build`
-first validates gates, then runs `next build` and emits library JavaScript and
-TypeScript declarations to `dist/`. `package.json` whitelists only `dist` and
-this README for npm publication, keeping Next app internals out of library
-artifacts.
+[ref:health-route]. `src/index.ts` remains a dependency-free library API. Root
+`package.json` is private and keeps only application dependencies and scripts.
+After its gates pass, `make build` runs `next build`, emits library JavaScript
+and declarations, then stages `dist/package.json` and `dist/README.md`. That
+staged manifest inherits package name, version, and description, but declares
+only library-relative `index.js`/`index.d.ts` exports—no Next/React dependencies
+or application scripts. Verify exactly what consumers receive with:
+
+```sh
+corepack pnpm --dir dist pack --pack-destination /tmp/library-pack
+```
+
+The staged README documents package installation and `example` import usage.
 
 `make dev` serves Next locally. The Fly Docker image runs Next standalone output
 on `0.0.0.0:8080`; Fly health checks use `/health`.
@@ -82,5 +90,6 @@ with normal semver reset rules. They never create commits, tags, or branches.
 build, then creates local annotated `vVERSION` tag. It never pushes. `make
 deploy-npm` requires clean standalone exact annotated release state, custom
 package name, and `NPM_TOKEN`; it creates a restrictive temporary npm config
-that supplies that token to the npm registry, then builds current artifacts and
-publishes. Deploy, release, publish, and migrations never run automatically.
+that supplies that token to the npm registry, builds current artifacts, and
+publishes only staged `dist/`. Deploy, release, publish, and migrations never
+run automatically.

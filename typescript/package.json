@@ -4,20 +4,9 @@
   "description": "Standalone Next.js application and TypeScript library scaffold",
   "type": "module",
   "packageManager": "pnpm@12.4.1",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "private": true,
   "scripts": {
-    "build": "rm -rf dist && next build && tsc -p tsconfig.lib.json",
+    "build": "rm -rf dist && next build && tsc -p tsconfig.lib.json && node scripts/stage-library.mjs",
     "dev": "next dev",
     "start": "next start",
     "test": "vitest run --config vitest.config.ts",

@@ -98,7 +98,7 @@ after exact =yes=. EOF, refusal, and every other response preserve volumes.
 | Folder       | Development service | Build artifact |
 |--------------+---------------------+----------------|
 | =python/=    | FastAPI reload, port 8000 | wheel and source distribution |
-| =typescript/=| Next development server, port 3000 | Next app plus separate =dist/= library output |
+| =typescript/=| Next development server, port 3000 | Next app plus staged =dist/= library package |
 | =golang/=    | project-local Air, port 8080 | =bin/golang= Fly application binary |
 | =clojure/=   | JVM HTTP server, port 8080 | library JAR in =target/= |
 
@@ -122,7 +122,7 @@ Publishing is explicit and credential-guarded:
 | Folder       | Target | Publication behavior |
 |--------------+--------+----------------------|
 | =python/=    | =deploy-pypi= | Publish current wheel and source distribution with =UV_PUBLISH_TOKEN=. |
-| =typescript/=| =deploy-npm= | Publish library files with =NPM_TOKEN= through restrictive temporary npm config. |
+| =typescript/=| =deploy-npm= | Publish staged =dist/= library package with =NPM_TOKEN= through restrictive temporary npm config. |
 | =golang/=    | =deploy-go= | Push current release tag to =origin= for module discovery; no central upload. |
 | =clojure/=   | =deploy-clojars= | Publish current JAR/POM with Clojars credentials. |
 
