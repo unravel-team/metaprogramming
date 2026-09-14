@@ -75,7 +75,7 @@ exact `yes`; EOF, refusal, or any other response keeps local data.
 | Language | Build result | `clean-cache` behavior |
 |---|---|---|
 | Python | Wheel and source distribution. | Removes project test/lint/coverage caches and UV download cache. |
-| TypeScript | Next application plus separate `dist/` library JS/declarations; package whitelist keeps application internals out of npm artifact. | Removes `.next/cache`, local tool cache, coverage temporary files; leaves dependencies. |
+| TypeScript | Next application plus staged `dist/` library JS/declarations, generated library-only manifest, and dedicated README; root app manifest stays private. | Removes `.next/cache`, local tool cache, coverage temporary files; leaves dependencies. |
 | Go | Runnable `bin/golang` Fly binary. | Runs `go clean -cache -testcache`; preserves downloaded module cache, though build/test caches may be shared by local projects. |
 | Clojure | Library JAR in `target/`, never installed into local Maven. | Removes project CLI/linter cache and preserves global Maven cache. |
 
@@ -92,7 +92,7 @@ folder.
 | Language | Metadata and special guard | Explicit publish target |
 |---|---|---|
 | Python | Project version and lock/literate version metadata stay synchronized. | `deploy-pypi`: needs PEP 503-unique package name, `UV_PUBLISH_TOKEN`, and current exact-HEAD annotated tag; rebuilds current wheel/source distribution. |
-| TypeScript | `package.json` version. | `deploy-npm`: needs unique package name, `NPM_TOKEN`, and current exact-HEAD annotated tag; temporary restrictive npm config supplies registry credential. |
+| TypeScript | Root `package.json` version; generated `dist/package.json` inherits it. | `deploy-npm`: needs unique package name, `NPM_TOKEN`, and current exact-HEAD annotated tag; temporary restrictive npm config supplies registry credential and publishes staged `dist/` only. |
 | Go | `VERSION`; v2+ version requires matching `/vN` module path. | `deploy-go`: needs non-placeholder public module, `origin`, credentials, and current tag; pushes tag for module discovery rather than uploading registry artifact. |
 | Clojure | `VERSION` with build-derived library identity. | `deploy-clojars`: needs unique `build.clj` library, Clojars credentials, current tag, JAR, and POM. |
 

@@ -131,7 +131,7 @@ deploy-npm: ## Publish only clean standalone current-version release artifacts
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
 	@npmrc=$$(mktemp); trap 'rm -f "$$npmrc"' EXIT; chmod 600 "$$npmrc"; \
 	printf '//registry.npmjs.org/:_authToken=%s\n' "$$NPM_TOKEN" > "$$npmrc"; \
-	NPM_CONFIG_USERCONFIG="$$npmrc" $(PNPM) publish --access public --no-git-checks
+	NPM_CONFIG_USERCONFIG="$$npmrc" $(PNPM) --dir dist publish --access public --no-git-checks
 
 version: ## Print semantic package version
 	@node $(VERSION_SCRIPT) version
