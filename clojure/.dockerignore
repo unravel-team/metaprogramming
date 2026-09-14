@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+.git
+.cpcache
+.clj-kondo
+coverage
+target
+.aider.*

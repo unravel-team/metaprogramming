@@ -1,0 +1,3 @@
+{:store :database
+ :migration-dir "migrations"
+ :migration-table-name "schema_migrations"}
