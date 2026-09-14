@@ -121,6 +121,15 @@ class ReviewRegressions(unittest.TestCase):
                 self.assertEqual(result.stdout.strip(), "exported-url" if override else "file-url-$(touch should-not-exist)")
                 self.assertFalse((dest / "should-not-exist").exists())
 
+    @unittest.skipUnless(shutil.which("uv") and (ROOT / "python/.venv").exists(), "Python init required")
+    def test_python_alembic_accepts_percent_encoded_password(self):
+        if "python" not in LANGUAGES:
+            self.skipTest("Python only")
+        with scaffold("python") as dest:
+            env = dict(os.environ, UV_PROJECT_ENVIRONMENT=str(ROOT / "python/.venv"), DATABASE_URL="postgresql+psycopg://fixture:p%25ss@localhost/fixture")
+            result = run(["uv", "run", "--no-sync", "alembic", "upgrade", "head", "--sql"], dest, env=env)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     @unittest.skipUnless(shutil.which("clojure"), "Clojure required")
     def test_clojure_migration_uses_env_file(self):
         if "clojure" not in LANGUAGES:
