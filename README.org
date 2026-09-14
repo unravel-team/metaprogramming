@@ -24,7 +24,7 @@ checking, and Fly CLI is needed only for Fly deployment.
 |--------------+-----------------------------------------------------+----------------------------------------------------|
 | =python/=    | Python 3.12+, =uv=, =tagref=                        | locked Python dependencies                         |
 | =typescript/=| Node.js 22+, Corepack, =tagref=                     | locked pnpm dependencies                           |
-| =golang/=    | Go 1.24+, =tagref=                                  | modules; pinned local Air, Goose, audit, lint tools|
+| =golang/=    | Go 1.26+, =tagref=                                  | modules; pinned local Air, Goose, audit, lint tools|
 | =clojure/=   | JDK 21+, Clojure CLI, =tagref=                      | pinned Clojure aliases                             |
 
 In copied scaffold:

@@ -13,7 +13,7 @@ language differences rather than hiding them behind a root wrapper.
 |---|---|---|---|
 | Python | Python 3.12+, uv, tagref | Copies missing `.env`; `uv sync --locked`. | `uv lock --check` validates `uv.lock`. |
 | TypeScript | Node.js 22+, Corepack, tagref | Copies missing `.env`; `corepack pnpm install --frozen-lockfile`. | Frozen lockfile-only validation; neither installs nor changes lock. |
-| Go | Go 1.24+, tagref | Copies missing `.env`; downloads/verifies modules and installs pinned tools into `.tools/bin`. | `go mod verify` plus `go mod tidy -diff`; reports drift without rewriting metadata. |
+| Go | Go 1.26+, tagref | Copies missing `.env`; downloads/verifies modules and installs pinned tools into `.tools/bin`. | `go mod verify` plus `go mod tidy -diff`; reports drift without rewriting metadata. |
 | Clojure | JDK 21+, Clojure CLI, tagref | Copies missing `.env`; prefetches pinned aliases. | `clojure -Srepro -Spath` resolves project classpath. No native Clojure lockfile means this is not an offline/frozen guarantee. |
 
 Docker Compose is needed for local PostgreSQL. Fly CLI is required only for Fly

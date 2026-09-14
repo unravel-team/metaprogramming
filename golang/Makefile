@@ -2,6 +2,9 @@ SHELL := /bin/bash
 .SHELLFLAGS := -Eeu -o pipefail -c
 .DEFAULT_GOAL := help
 
+# [tag:go_setup_toolchain] Pinned golangci-lint requires Go 1.26+; never auto-switch toolchains.
+export GOTOOLCHAIN := local
+
 TOOLS_BIN := $(CURDIR)/.tools/bin
 AIR := $(TOOLS_BIN)/air
 GOOSE := $(TOOLS_BIN)/goose
