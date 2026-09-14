@@ -20,12 +20,13 @@ doctor: ## Diagnose host prerequisites and synced project tools
 			echo "$$command: missing"; \
 		fi; \
 	done
-	@$(UV_RUN) python --version
-	@$(UV_RUN) ruff --version
-	@$(UV_RUN) pytest --version
-	@$(UV_RUN) basedpyright --version
-	@$(UV_RUN) ty --version
-	@$(UV_RUN) bandit --version
+	@status=0; for command in python ruff pytest basedpyright ty bandit; do \
+		if $(UV_RUN) $$command --version >/dev/null 2>&1; then \
+			echo "$$command: found"; \
+		else \
+			echo "$$command: missing or project is not initialized"; status=1; \
+		fi; \
+	done; exit $$status
 
 init: ## Create .env when absent and install locked dependencies
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example."; else echo ".env exists; not replacing it."; fi
@@ -110,12 +111,12 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for yes
 	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
 	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
 
-migrate: ## Apply Alembic migrations using DATABASE_URL or local default
-	@$(UV_RUN) alembic upgrade head
+migrate: ## Apply Alembic migrations using .env DATABASE_URL or exported override
+	@$(UV_RUN) --env-file .env alembic upgrade head
 
 migrate-create: ## Create Alembic revision; use MESSAGE='describe change'
 	@test -n "$(MESSAGE)" || { echo "MESSAGE is required, e.g. make migrate-create MESSAGE='add widgets'"; exit 2; }
-	@$(UV_RUN) alembic revision --autogenerate -m "$(MESSAGE)"
+	@$(UV_RUN) --env-file .env alembic revision --autogenerate -m "$(MESSAGE)"
 
 deploy: build ## Deploy to Fly only after app identity is customized
 	@app_name=$$(awk -F '"' '/^app = / { print $$2; exit }' fly.toml); \
@@ -129,14 +130,15 @@ deploy-pypi: ## Build and publish current artifacts only from exact clean releas
 	[ "$$root" = "$$(pwd -P)" ] || { echo "Publishing must run from standalone project root."; exit 2; }; \
 	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Publishing requires clean committed state."; exit 2; fi; \
 	package_name=$$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["name"])'); \
+	package_identity=$$(python3 -c 'import re, sys; print(re.sub(r"[-_.]+", "-", sys.argv[1]).lower())' "$$package_name"); \
 	version=$$(python3 $(VERSION_SCRIPT) version); \
-	if [ "$$package_name" = "$(PLACEHOLDER_PACKAGE)" ]; then echo "Set unique project.name before publishing."; exit 2; fi; \
+	if [ "$$package_identity" = "$(PLACEHOLDER_PACKAGE)" ]; then echo "Set unique project.name before publishing."; exit 2; fi; \
 	if [ -z "$${UV_PUBLISH_TOKEN:-}" ]; then echo "UV_PUBLISH_TOKEN is required."; exit 2; fi; \
 	tag="v$$version"; git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }; \
 	rm -rf dist; \
 	$(MAKE) --no-print-directory build; \
 	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi; \
-	distribution=$$(python3 -c 'import re, tomllib; name=tomllib.load(open("pyproject.toml", "rb"))["project"]["name"]; print(re.sub(r"[-.]+", "_", name))'); \
+	distribution=$$(python3 -c 'import re, tomllib; name=tomllib.load(open("pyproject.toml", "rb"))["project"]["name"]; print(re.sub(r"[-_.]+", "-", name).lower().replace("-", "_"))'); \
 	sdist="dist/$$distribution-$$version.tar.gz"; wheel="dist/$$distribution-$$version-py3-none-any.whl"; \
 	test -f "$$sdist" && test -f "$$wheel" || { echo "Expected current-version distribution artifacts are missing."; exit 2; }; \
 	uv publish "$$sdist" "$$wheel"

@@ -15,9 +15,11 @@ Compose supports local PostgreSQL; Fly CLI is needed only for Fly deployment.
 
 `make init` copies `.env.example` when `.env` is absent and installs dependencies
 locked in `uv.lock`. Normal workflow commands use `uv run --no-sync`: run
-`make init` first rather than allowing checks/tests to change dependency state. `make doctor`
-reports host commands and project tools. `make upgrade-deps` is intentional
-maintenance work; review changed metadata and lockfile together.
+`make init` first rather than allowing checks/tests to change dependency state.
+Migration targets also load `.env` through UV, with exported `DATABASE_URL`
+taking precedence. `make doctor` reports host commands and every project tool.
+`make upgrade-deps` is intentional maintenance work; review changed metadata and
+lockfile together.
 
 ## Test workflow
 
@@ -40,8 +42,9 @@ them in parallel. Run `make init` first and provide network access for audit.
 
 `make dev` serves `python_scaffold.api:app`; `GET /health` returns
 `{"status":"ok"}` [ref:health-route]. `make infra-up` starts PostgreSQL with
-named `postgres_data` volume. `make migrate` runs Alembic against `DATABASE_URL`
-from environment (or local default). Create revisions with:
+named `postgres_data` volume. After `make init`, both Alembic migration targets
+load `DATABASE_URL` from `.env`; an exported value takes precedence, otherwise
+Alembic uses its local default. Create revisions with:
 
   ```sh
   make migrate-create MESSAGE='add widgets'
@@ -58,11 +61,12 @@ name before distribution. `make deploy` rejects placeholder Fly app identity;
 container binds `0.0.0.0:8080` and Fly checks `/health`.
 
 `make version` prints plain semantic version. `make major`, `make minor`, and
-`make patch` atomically update project metadata, UV lock metadata, and literate
-source with standard reset rules. `make release` requires this copied scaffold to
-be clean standalone Git root before and after validation/build, then creates local
-annotated `vVERSION` tag. It never commits, pushes, or changes branches. `make
-deploy-pypi` requires unique package name, `UV_PUBLISH_TOKEN`, and annotated
-`vVERSION` tag pointing exactly at clean `HEAD`; it removes stale `dist`, builds,
-and publishes only current-version wheel and source distribution. No publish/deploy
-command runs automatically.
+`make patch` update project metadata, UV lock metadata, and literate source
+sequentially after prevalidation, with standard reset rules. `make release`
+requires this copied scaffold to be clean standalone Git root before and after
+validation/build, then creates local annotated `vVERSION` tag. It never commits,
+pushes, or changes branches. `make deploy-pypi` requires unique package name,
+`UV_PUBLISH_TOKEN`, and annotated `vVERSION` tag pointing exactly at clean `HEAD`;
+it uses PEP 503 canonical identity for unique-name and artifact checks, removes
+stale `dist`, builds, and publishes only current-version wheel and source
+distribution. No publish/deploy command runs automatically.

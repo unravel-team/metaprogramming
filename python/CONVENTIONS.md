@@ -33,9 +33,10 @@
 
 ## Build/Test Commands
 
+- Setup: `make init`
 - Build: `make build`
-- Install locally: `make install`
-- Run all tests: `make test`
+- Run default unit and property tests: `make test`
+- Run full suite, including integration and LLM tests: `make test-all`
 - Full check: `make check` (runs linters and formatting checks)
 - Format the code: `make format`. Uses `ruff` for formatting.
 

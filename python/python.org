@@ -19,8 +19,9 @@ PostgreSQL, =tagref= for reference checks, and Fly CLI only for deployment.
 
 Run =make init= once. It copies =.env.example= only when =.env= is absent and
 installs locked runtime and development dependencies. Normal commands use
-=uv run --no-sync=, so they fail rather than modifying dependencies. Use
-=make upgrade-deps= only for deliberate dependency maintenance.
+=uv run --no-sync=, so they fail rather than modifying dependencies. Migration
+targets additionally load =.env= as data through UV; an exported =DATABASE_URL=
+wins. Use =make upgrade-deps= only for deliberate dependency maintenance.
 
 ** Checks, tests, and artifacts
 
@@ -45,20 +46,23 @@ checks use =/health= [tag:health-route].
 
 ** Database, release, and publishing safety
 
-Alembic reads =DATABASE_URL= when provided, otherwise its local Compose URL.
+After =make init=, Alembic migration targets load =.env= through UV; an
+exported =DATABASE_URL= wins, otherwise Alembic uses its local Compose URL.
 =make migrate= applies migrations; =make migrate-create MESSAGE='description'=
 creates a real Alembic revision. Local PostgreSQL data lives in named Compose
 volume. =make infra-down-clean= always prompts; only exact =yes= removes volume.
 
 =make version= prints package semantic version. =make major=, =make minor=, and
-=make patch= update project, lock, and literate metadata without dependency
-resolution; no command commits, tags, or pushes. =make release= requires this
-copied directory to be its own clean Git root before and after validation/build,
-then creates local annotated =vVERSION= tag. It cannot tag containing repository.
-=make deploy-pypi= needs non-placeholder package name, exact-HEAD annotated local
-release tag, and =UV_PUBLISH_TOKEN=; it deletes stale artifacts, rebuilds, and
-publishes only current-version files.
-=make deploy= requires customized Fly app name and never uses shared default.
+=make patch= update project, lock, and literate metadata sequentially after
+prevalidation, without dependency resolution; no command commits, tags, or
+pushes. =make release= requires this copied directory to be its own clean Git
+root before and after validation/build, then creates local annotated =vVERSION=
+tag. It cannot tag containing repository. =make deploy-pypi= needs non-placeholder
+package name, exact-HEAD annotated local release tag, and =UV_PUBLISH_TOKEN=;
+it compares package names and derives artifact stems using PEP 503 canonical
+identity, deletes stale artifacts, rebuilds, and publishes only current-version
+files. =make deploy= requires customized Fly app name and never uses shared
+default.
 
 * Generated workflow
 
@@ -85,12 +89,13 @@ doctor: ## Diagnose host prerequisites and synced project tools
 			echo "$$command: missing"; \
 		fi; \
 	done
-	@$(UV_RUN) python --version
-	@$(UV_RUN) ruff --version
-	@$(UV_RUN) pytest --version
-	@$(UV_RUN) basedpyright --version
-	@$(UV_RUN) ty --version
-	@$(UV_RUN) bandit --version
+	@status=0; for command in python ruff pytest basedpyright ty bandit; do \
+		if $(UV_RUN) $$command --version >/dev/null 2>&1; then \
+			echo "$$command: found"; \
+		else \
+			echo "$$command: missing or project is not initialized"; status=1; \
+		fi; \
+	done; exit $$status
 
 init: ## Create .env when absent and install locked dependencies
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example."; else echo ".env exists; not replacing it."; fi
@@ -175,12 +180,12 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for yes
 	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
 	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
 
-migrate: ## Apply Alembic migrations using DATABASE_URL or local default
-	@$(UV_RUN) alembic upgrade head
+migrate: ## Apply Alembic migrations using .env DATABASE_URL or exported override
+	@$(UV_RUN) --env-file .env alembic upgrade head
 
 migrate-create: ## Create Alembic revision; use MESSAGE='describe change'
 	@test -n "$(MESSAGE)" || { echo "MESSAGE is required, e.g. make migrate-create MESSAGE='add widgets'"; exit 2; }
-	@$(UV_RUN) alembic revision --autogenerate -m "$(MESSAGE)"
+	@$(UV_RUN) --env-file .env alembic revision --autogenerate -m "$(MESSAGE)"
 
 deploy: build ## Deploy to Fly only after app identity is customized
 	@app_name=$$(awk -F '"' '/^app = / { print $$2; exit }' fly.toml); \
@@ -194,14 +199,15 @@ deploy-pypi: ## Build and publish current artifacts only from exact clean releas
 	[ "$$root" = "$$(pwd -P)" ] || { echo "Publishing must run from standalone project root."; exit 2; }; \
 	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Publishing requires clean committed state."; exit 2; fi; \
 	package_name=$$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["name"])'); \
+	package_identity=$$(python3 -c 'import re, sys; print(re.sub(r"[-_.]+", "-", sys.argv[1]).lower())' "$$package_name"); \
 	version=$$(python3 $(VERSION_SCRIPT) version); \
-	if [ "$$package_name" = "$(PLACEHOLDER_PACKAGE)" ]; then echo "Set unique project.name before publishing."; exit 2; fi; \
+	if [ "$$package_identity" = "$(PLACEHOLDER_PACKAGE)" ]; then echo "Set unique project.name before publishing."; exit 2; fi; \
 	if [ -z "$${UV_PUBLISH_TOKEN:-}" ]; then echo "UV_PUBLISH_TOKEN is required."; exit 2; fi; \
 	tag="v$$version"; git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }; \
 	rm -rf dist; \
 	$(MAKE) --no-print-directory build; \
 	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi; \
-	distribution=$$(python3 -c 'import re, tomllib; name=tomllib.load(open("pyproject.toml", "rb"))["project"]["name"]; print(re.sub(r"[-.]+", "_", name))'); \
+	distribution=$$(python3 -c 'import re, tomllib; name=tomllib.load(open("pyproject.toml", "rb"))["project"]["name"]; print(re.sub(r"[-_.]+", "-", name).lower().replace("-", "_"))'); \
 	sdist="dist/$$distribution-$$version.tar.gz"; wheel="dist/$$distribution-$$version-py3-none-any.whl"; \
 	test -f "$$sdist" && test -f "$$wheel" || { echo "Expected current-version distribution artifacts are missing."; exit 2; }; \
 	uv publish "$$sdist" "$$wheel"
@@ -437,6 +443,11 @@ def format_version(version: tuple[int, int, int]) -> str:
     return ".".join(map(str, version))
 
 
+def normalize_project_name(name: str) -> str:
+    """Normalize project name under PEP 503."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
 def replace_one(
     pattern: re.Pattern[str], source: str, replacement: str, label: str
 ) -> str:
@@ -448,9 +459,9 @@ def replace_one(
 
 
 def bump(part: str) -> str:
-    """Atomically update semantic version metadata without resolving dependencies."""
+    """Update semantic version metadata sequentially after prevalidation."""
     source = PYPROJECT.read_text()
-    project_name = tomllib.loads(source)["project"]["name"]
+    project_name = normalize_project_name(tomllib.loads(source)["project"]["name"])
     major, minor, patch = read_version()
     if part == "major":
         next_version = (major + 1, 0, 0)
@@ -524,7 +535,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 if database_url := os.environ.get("DATABASE_URL"):
-    config.set_main_option("sqlalchemy.url", database_url)
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 target_metadata = MetaData()
 
@@ -716,9 +727,11 @@ Compose supports local PostgreSQL; Fly CLI is needed only for Fly deployment.
 
 `make init` copies `.env.example` when `.env` is absent and installs dependencies
 locked in `uv.lock`. Normal workflow commands use `uv run --no-sync`: run
-`make init` first rather than allowing checks/tests to change dependency state. `make doctor`
-reports host commands and project tools. `make upgrade-deps` is intentional
-maintenance work; review changed metadata and lockfile together.
+`make init` first rather than allowing checks/tests to change dependency state.
+Migration targets also load `.env` through UV, with exported `DATABASE_URL`
+taking precedence. `make doctor` reports host commands and every project tool.
+`make upgrade-deps` is intentional maintenance work; review changed metadata and
+lockfile together.
 
 ## Test workflow
 
@@ -741,8 +754,9 @@ them in parallel. Run `make init` first and provide network access for audit.
 
 `make dev` serves `python_scaffold.api:app`; `GET /health` returns
 `{"status":"ok"}` [ref:health-route]. `make infra-up` starts PostgreSQL with
-named `postgres_data` volume. `make migrate` runs Alembic against `DATABASE_URL`
-from environment (or local default). Create revisions with:
+named `postgres_data` volume. After `make init`, both Alembic migration targets
+load `DATABASE_URL` from `.env`; an exported value takes precedence, otherwise
+Alembic uses its local default. Create revisions with:
 
   ```sh
   make migrate-create MESSAGE='add widgets'
@@ -759,12 +773,13 @@ name before distribution. `make deploy` rejects placeholder Fly app identity;
 container binds `0.0.0.0:8080` and Fly checks `/health`.
 
 `make version` prints plain semantic version. `make major`, `make minor`, and
-`make patch` atomically update project metadata, UV lock metadata, and literate
-source with standard reset rules. `make release` requires this copied scaffold to
-be clean standalone Git root before and after validation/build, then creates local
-annotated `vVERSION` tag. It never commits, pushes, or changes branches. `make
-deploy-pypi` requires unique package name, `UV_PUBLISH_TOKEN`, and annotated
-`vVERSION` tag pointing exactly at clean `HEAD`; it removes stale `dist`, builds,
-and publishes only current-version wheel and source distribution. No publish/deploy
-command runs automatically.
+`make patch` update project metadata, UV lock metadata, and literate source
+sequentially after prevalidation, with standard reset rules. `make release`
+requires this copied scaffold to be clean standalone Git root before and after
+validation/build, then creates local annotated `vVERSION` tag. It never commits,
+pushes, or changes branches. `make deploy-pypi` requires unique package name,
+`UV_PUBLISH_TOKEN`, and annotated `vVERSION` tag pointing exactly at clean `HEAD`;
+it uses PEP 503 canonical identity for unique-name and artifact checks, removes
+stale `dist`, builds, and publishes only current-version wheel and source
+distribution. No publish/deploy command runs automatically.
 #+end_src

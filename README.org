@@ -84,9 +84,10 @@ After =make init=, normal dependency checks do not mutate manifests or locks:
 
 Each scaffold supplies PostgreSQL Compose template and migration target. Migration
 tools remain language-native: Alembic (Python), dbmate (TypeScript), Goose (Go),
-and Migratus (Clojure). =make migrate-create= creates a migration; Python's
-Alembic autogeneration also inspects the configured database. =make migrate=
-contacts that database. Treat both as explicit operations.
+and Migratus (Clojure). After Python =make init=, both Alembic migration targets
+load =.env= through UV and an exported =DATABASE_URL= wins. =make migrate-create=
+creates a migration; Python's Alembic autogeneration also inspects the configured
+database. =make migrate= contacts that database. Treat both as explicit operations.
 
 =make infra-up= starts local services; =make infra-down= stops them. =make
 infra-down-clean= warns about irreversible local data loss and removes volumes only

@@ -30,6 +30,11 @@ def format_version(version: tuple[int, int, int]) -> str:
     return ".".join(map(str, version))
 
 
+def normalize_project_name(name: str) -> str:
+    """Normalize project name under PEP 503."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
 def replace_one(
     pattern: re.Pattern[str], source: str, replacement: str, label: str
 ) -> str:
@@ -41,9 +46,9 @@ def replace_one(
 
 
 def bump(part: str) -> str:
-    """Atomically update semantic version metadata without resolving dependencies."""
+    """Update semantic version metadata sequentially after prevalidation."""
     source = PYPROJECT.read_text()
-    project_name = tomllib.loads(source)["project"]["name"]
+    project_name = normalize_project_name(tomllib.loads(source)["project"]["name"])
     major, minor, patch = read_version()
     if part == "major":
         next_version = (major + 1, 0, 0)
