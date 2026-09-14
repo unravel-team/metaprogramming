@@ -86,6 +86,7 @@ class ScaffoldContract(unittest.TestCase):
                 self.assertIn(publish, table)
                 result = run(["make", "--no-print-directory", "help"], ROOT / language)
                 self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertGreaterEqual(len(result.stdout.splitlines()), len(TARGETS))
 
     def test_volume_removal_requires_explicit_yes(self):
         for language in LANGUAGES:
