@@ -4,7 +4,7 @@ Copied standalone Go library and HTTP service scaffold.
 
 ## Setup
 
-Install Go 1.24+, Docker Compose, Fly CLI (`fly`), and `tagref` on host. `make init`
+Install Go 1.26+ [ref:go_setup_toolchain], Docker Compose, Fly CLI (`fly`), and `tagref` on host. `make init`
 copies `.env.example` only when `.env` is absent, downloads declared modules, and
 installs pinned Air, Goose, `govulncheck`, and `golangci-lint` under `.tools/bin`. It never installs
 host runtimes or tools with curl, Homebrew, or another system package manager.
