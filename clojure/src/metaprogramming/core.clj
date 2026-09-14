@@ -1,3 +1,3 @@
 (ns metaprogramming.core)
 
-(defn example [x] "Example function." (* x 2))
+(defn example "Example function." [x] (* x 2))

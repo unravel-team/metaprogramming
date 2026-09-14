@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: clojure_scaffold
+      POSTGRES_USER: clojure_scaffold
+      POSTGRES_PASSWORD: change-me
+    ports:
+      - "5432:5432"
+    volumes:
+      - clojure_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  clojure_postgres_data:
