@@ -6,8 +6,7 @@
     "**/*.config.*",
     "node_modules/**",
     "dist/**",
-    "build/**",
-    ".svelte-kit/**",
+    ".next/**",
     "coverage/**"
   ]
 }

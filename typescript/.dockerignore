@@ -1,0 +1,10 @@
+# Keep host dependencies, build output, and local secrets out of Docker context.
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.pnpm-store/
+.git/
+.agents/
+*.tsbuildinfo
