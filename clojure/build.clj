@@ -69,6 +69,4 @@
               :class-dir class-dir})
   (println (format "Installed %s %s locally" lib (version))))
 
-(defn deploy
-  [_]
-  (run-command! ["make" "deploy-clojars"]))
+(defn deploy [_] (run-command! ["make" "deploy-clojars"]))

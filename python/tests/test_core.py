@@ -1,5 +1,7 @@
 """Unit tests exercise the shipped library and HTTP application."""
 
+from http import HTTPStatus
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,5 +19,5 @@ def test_example(value: int, expected: int) -> None:
 def test_health() -> None:
     with TestClient(app) as client:
         response = client.get("/health")
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     assert response.json() == {"status": "ok"}
