@@ -44,8 +44,8 @@ check-ruff: ## Lint source, tests, release helper, and Alembic files
 check-ty: ## Run Ty type checks on shipped source and tests
 	@$(UV_RUN) ty check src tests
 
-check-basedpyright: ## Run BasedPyright on shipped source and tests
-	@$(UV_RUN) basedpyright src tests
+check-basedpyright: ## Run BasedPyright using the source scope in pyproject.toml
+	@$(UV_RUN) basedpyright
 
 check-bandit: ## Scan application source for common security issues
 	@$(UV_RUN) bandit -q -ii -lll -c .bandit.yml -r src
