@@ -17,3 +17,6 @@ __pycache__/
 **/.env
 .agents/
 .pi/subagents/
+
+# bv (beads viewer) local config and caches
+.bv/
