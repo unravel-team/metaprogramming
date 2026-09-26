@@ -2,6 +2,9 @@ SHELL := /bin/bash
 .SHELLFLAGS := -Eeu -o pipefail -c
 .DEFAULT_GOAL := help
 
+# Keep setup and normal commands on the same project-owned cache.
+export UV_CACHE_DIR
+override UV_CACHE_DIR := $(CURDIR)/.cache/uv
 UV_RUN := uv run --no-sync
 VERSION_SCRIPT := scripts/release.py
 PLACEHOLDER_APP := replace-with-your-fly-app-name
@@ -174,6 +177,11 @@ clean: ## Remove local build, coverage, and Python bytecode artifacts
 	@find . -type d -name __pycache__ -prune -exec rm -rf {} +
 	@find . -type f -name '*.py[co]' -delete
 
-clean-cache: ## Remove project tool caches and UV download cache
-	@rm -rf .pytest_cache .ruff_cache .coverage.*
-	@uv cache clean
+clean-cache: ## Remove only project-owned UV, pytest, and Ruff caches
+	@for cache in .cache/uv .pytest_cache .ruff_cache; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	rm -rf -- .cache/uv .pytest_cache .ruff_cache

@@ -136,11 +136,13 @@ annotated release tag, and its credentials. None run as part of =release= or =ci
 =make clean= removes generated artifacts. Use =make clean-cache= only when
 troubleshooting language caches:
 
-- Python removes project test/lint coverage caches and UV download cache.
-- TypeScript removes project Next and tool caches, not dependencies.
-- Go clears build and test caches with =go clean -cache -testcache=, preserving
-  downloaded module cache; these Go caches can be shared by local projects.
+- Python uses =.cache/uv= and removes only that UV cache plus project pytest/Ruff caches.
+- TypeScript uses =.cache/pnpm/store= and removes that store plus project Next/tool caches, not installed dependencies.
+- Go uses =GOCACHE=.cache/go-build= and clears only that build/test cache, preserving shared caches and downloaded modules.
 - Clojure removes project CLI and linter caches, preserving global Maven cache.
+
+All =clean-cache= targets reject symlinked deletion paths and parent directories.
+Run =make init= to populate the project-local caches when needed.
 
 * Recommended tools
 
