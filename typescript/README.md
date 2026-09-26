@@ -45,7 +45,7 @@ on `0.0.0.0:8080`; Fly health checks use `/health`.
 
 ## Tests and checks
 
-- `make test` runs unit and fast-check property tests only.
+- `make test` runs unit and Hegel property tests only.
 - `make test-unit` excludes `*.property.test.ts`, `*.integration.test.ts`, and
   `*.llm.test.ts`; `make test-property` selects property files and excludes
   external variants.
@@ -64,6 +64,44 @@ TypeScript checks, Knip, jscpd, and tag reference validation. It is offline afte
 `make init`. `make audit-deps` queries npm advisories, requires network access,
 and fails when findings meet npm's low severity threshold. `make ci` includes
 check, default tests, and audit; run init first and supply network access.
+
+### Hegel pilot
+
+`@hegeldev/hegel` is pinned to 0.4.7 as a development dependency. Vitest remains
+the runner; `hegel.test` executes immediately, so call it **inside** the Vitest
+callback as shown in `tests/example.property.test.ts`. The sample uses bounded
+integers to keep arithmetic within the intended domain.
+
+`make init` installs the platform-specific native engine under `node_modules`.
+`pnpm-workspace.yaml` permits only Koffi's native install script; Docker dependency
+setup copies this policy too. Do not omit optional dependencies. Make clears any
+host `HEGEL_LIBHEGEL_PATH` override so the locked platform package is used. No
+Python server, test-time downloads, or application runtime dependency is added.
+
+Upstream native packages cover Linux x64/arm64, macOS arm64, and Windows x64/arm64;
+Intel macOS has no prebuilt engine. The scaffold Makefile still requires Bash.
+This pilot was exercised on macOS arm64, not Linux/Windows or Docker. Run the
+same acceptance checks before relying on another platform or container libc.
+
+For repeatable investigation, pass `{ seed: 2026, database: hegel.Database.disabled }`
+as the second argument to `hegel.test`. Keep the library/engine version, property,
+and settings unchanged when replaying. Use the minimized concrete input in a named
+regression test for durable reproduction across upgrades. Default runs explore
+100 cases; don't permanently fix a seed merely to make a failure disappear.
+
+Local example databases under `.hegel/` are ignored by Git/Docker and deliberately
+preserved by `clean`/`clean-cache`. Hegel disables persistence and uses deterministic
+generation by default in CI. The native library remains an installed dependency,
+not a disposable cache. From the metaprogramming repository root, after setup:
+
+```sh
+HEGEL_PILOT=1 python3 -m unittest discover -s tests -p test_hegel_pilot.py -v
+```
+
+That opt-in check verifies actual execution, a deliberate failure shrinking to 50,
+seeded reproduction in a fresh process, and a corrected property passing. It also
+checks Go; copied standalone projects can use their ordinary `make test-property`.
+Hegel is beta: review dependency upgrades rather than assuming API stability.
 
 ## Database and local infrastructure
 

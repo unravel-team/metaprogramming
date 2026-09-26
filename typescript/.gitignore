@@ -6,3 +6,5 @@ coverage/
 .env
 *.tsbuildinfo
 .aider*
+
+.hegel/

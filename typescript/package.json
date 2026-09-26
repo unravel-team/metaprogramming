@@ -19,12 +19,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
+    "@hegeldev/hegel": "0.4.7",
     "@types/node": "26.5.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitest/coverage-v8": "5.0.0",
     "dbmate": "2.35.1",
-    "fast-check": "4.10.0",
     "jscpd": "5.2.0",
     "knip": "6.35.1",
     "typescript": "5.9.3",
