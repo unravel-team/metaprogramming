@@ -3,7 +3,6 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 CLOJURE := clojure -Srepro
-VERSION_SCRIPT := scripts/release.sh
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_LIB := clojure-scaffold
 CLOJURE_SOURCES := $(shell find src app test scripts -type f -name '*.clj' -print) build.clj
@@ -145,7 +144,7 @@ deploy-clojars: ## Publish current JAR only from exact clean standalone annotate
 	lib=$$($(CLOJURE) -T:build library-name); \
 	if [ -z "$$lib" ] || [ "$${lib##*/}" = "$(PLACEHOLDER_LIB)" ]; then echo "Set a unique build.clj library identity before publishing."; exit 2; fi; \
 	if [ -z "$${CLOJARS_USERNAME:-}" ] || [ -z "$${CLOJARS_PASSWORD:-}" ]; then echo "CLOJARS_USERNAME and CLOJARS_PASSWORD are required."; exit 2; fi; \
-	version=$$($(VERSION_SCRIPT) version); tag="v$$version"; \
+	version=$$($(CLOJURE) -T:build version); tag="v$$version"; \
 	git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }
 	@$(MAKE) --no-print-directory build
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
@@ -154,16 +153,16 @@ deploy-clojars: ## Publish current JAR only from exact clean standalone annotate
 	$(CLOJURE) -X:deploy-clojars :installer :remote :artifact "\"$$artifact\"" :pom-file "\"$$pom_file\"" :sign-releases? false
 
 version: ## Print plain semantic version
-	@$(VERSION_SCRIPT) version
+	@$(CLOJURE) -T:build version
 
 major: ## Bump major version metadata only
-	@$(VERSION_SCRIPT) major
+	@$(CLOJURE) -T:build major
 
 minor: ## Bump minor version metadata only
-	@$(VERSION_SCRIPT) minor
+	@$(CLOJURE) -T:build minor
 
 patch: ## Bump patch version metadata only
-	@$(VERSION_SCRIPT) patch
+	@$(CLOJURE) -T:build patch
 
 release: ## Validate then locally annotate clean standalone HEAD with current version
 	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Release requires standalone Git repository."; exit 2; }; \
@@ -171,7 +170,7 @@ release: ## Validate then locally annotate clean standalone HEAD with current ve
 	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Release requires clean committed state."; exit 2; fi
 	@$(MAKE) --no-print-directory build
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
-	@version=$$($(VERSION_SCRIPT) version); tag="v$$version"; \
+	@version=$$($(CLOJURE) -T:build version); tag="v$$version"; \
 	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
 	git tag --annotate "$$tag" --message "Release $$tag"
 

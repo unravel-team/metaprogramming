@@ -7,7 +7,7 @@
 (def class-dir "target/classes")
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 
-(defn version
+(defn- read-version
   []
   (let [value (str/trim (slurp "VERSION"))]
     (when-not (re-matches #"\d+\.\d+\.\d+" value)
@@ -15,7 +15,26 @@
                       {:value value})))
     value))
 
-(defn jar-file [] (format "target/%s-%s.jar" (name lib) (version)))
+(defn version [_] (println (read-version)))
+
+(defn- bump-version!
+  [component]
+  (let [[major minor patch] (mapv bigint (str/split (read-version) #"\."))
+        bumped (case component
+                 :major [(inc major) 0 0]
+                 :minor [major (inc minor) 0]
+                 :patch [major minor (inc patch)])
+        value (str/join "." bumped)]
+    (spit "VERSION" (str value "\n"))
+    (println value)))
+
+(defn major [_] (bump-version! :major))
+
+(defn minor [_] (bump-version! :minor))
+
+(defn patch [_] (bump-version! :patch))
+
+(defn jar-file [] (format "target/%s-%s.jar" (name lib) (read-version)))
 
 (defn pom-file
   []
@@ -53,7 +72,7 @@
   (b/copy-dir {:src-dirs ["src"], :target-dir class-dir})
   (b/write-pom {:class-dir class-dir,
                 :lib lib,
-                :version (version),
+                :version (read-version),
                 :basis @basis,
                 :src-dirs ["src"]})
   (b/jar {:class-dir class-dir, :jar-file (jar-file)})
@@ -64,9 +83,9 @@
   (jar nil)
   (b/install {:basis @basis,
               :lib lib,
-              :version (version),
+              :version (read-version),
               :jar-file (jar-file),
               :class-dir class-dir})
-  (println (format "Installed %s %s locally" lib (version))))
+  (println (format "Installed %s %s locally" lib (read-version))))
 
 (defn deploy [_] (run-command! ["make" "deploy-clojars"]))
