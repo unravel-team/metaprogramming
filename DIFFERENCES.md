@@ -32,12 +32,18 @@ arbitrary coverage percentage.
 | Language | Default/property runner | `check` specifics | Coverage output and limitation |
 |---|---|---|---|
 | Python | pytest with Hypothesis | UV lock, Ruff format/lint, Ty, BasedPyright, Bandit, tagref. | Terminal missing-lines report, `coverage.xml`, and HTML. Measures `src`; integration/LLM paths remain uncovered. |
-| TypeScript | Vitest with fast-check | Frozen pnpm validation, Biome, TypeScript, Knip, jscpd, tagref. | V8 terminal, LCOV, HTML under `coverage/`; includes unimported library/route source. Node Vitest does not render async Next server components, so dedicated integration coverage is needed there. |
-| Go | `go test` with Rapid | Module check, non-mutating gofmt, `go vet`, pinned `golangci-lint`, tagref. | Atomic profile, function summary, and HTML in `coverage/`; includes all packages and excludes only integration/LLM test prefixes. Unexecuted packages can be zero. |
+| TypeScript | Vitest with Hegel (pilot) | Frozen pnpm validation, Biome, TypeScript, Knip, jscpd, tagref. | V8 terminal, LCOV, HTML under `coverage/`; includes unimported library/route source. Node Vitest does not render async Next server components, so dedicated integration coverage is needed there. |
+| Go | `go test` with Hegel (pilot) | Module check, non-mutating gofmt, `go vet`, pinned `golangci-lint`, tagref. | Atomic profile, function summary, and HTML in `coverage/`; includes all packages and excludes only integration/LLM test prefixes. Unexecuted packages can be zero. |
 | Clojure | Cognitect runner with test.check | Base plus test/run/Migratus classpath resolution, pinned zprint, pinned clj-kondo, tagref. | Clofidence HTML in `coverage/` for unit/property tests; includes tested `app/` production source, skips test namespaces, and rethrows runner failures after reporting. External paths remain uncovered. |
 
-Property-test failures shrink generated cases: Hypothesis, fast-check, Rapid, and
-test.check each provide their ecosystem's shrinking behavior.
+Property-test failures shrink generated cases: Hypothesis, Hegel, and test.check
+provide shrinking. The Hegel pilot pins TypeScript 0.4.7 and Go v0.9.9; both use
+native engines and retain their existing test runners. TypeScript installs its
+platform package and explicitly permits Koffi's install script. Go copies its
+module-bundled engine to `.tools/libhegel` during `init`/`upgrade-deps`, bypassing
+implicit home-cache extraction. Neither needs the obsolete Python Hegel server.
+See each scaffold README for platforms, setup, and seeded replay. Python and
+Clojure retain their existing libraries.
 
 ## Audit and dependency network policy
 

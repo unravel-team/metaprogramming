@@ -26,7 +26,7 @@ TARGETS = {
     "migrate", "migrate-create", "deploy", "version", "major", "minor", "patch", "release",
 }
 IGNORE = shutil.ignore_patterns(
-    "node_modules", ".venv", ".tools", ".cache", ".cpcache", ".clj-kondo", "__pycache__",
+    "node_modules", ".venv", ".tools", ".cache", ".hegel", ".cpcache", ".clj-kondo", "__pycache__",
     ".pytest_cache", ".ruff_cache", ".next", "coverage", "target", "dist", "bin", "tmp", ".env",
 )
 
@@ -208,6 +208,8 @@ class ScaffoldContract(unittest.TestCase):
         if "golang" not in LANGUAGES:
             self.skipTest("Go lane only")
         with scaffold("golang") as dest:
+            setup = run(["sh", "scripts/setup-hegel.sh"], dest)
+            self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
             fixture = dest / "internal/mathx/selectors_test.go"
             fixture.write_text('''package mathx
 import "testing"
@@ -268,7 +270,7 @@ func TestLLMExcluded(t *testing.T) { t.Fatal("LLM escaped") }
         if "typescript" in LANGUAGES:
             package = json.loads((ROOT / "typescript/package.json").read_text())
             self.assertTrue(package["packageManager"].startswith("pnpm@"))
-            self.assertTrue({"knip", "jscpd", "fast-check", "@vitest/coverage-v8", "vitest"} <= package["devDependencies"].keys())
+            self.assertTrue({"knip", "jscpd", "@hegeldev/hegel", "@vitest/coverage-v8", "vitest"} <= package["devDependencies"].keys())
             self.assertEqual(package["devDependencies"]["vitest"], package["devDependencies"]["@vitest/coverage-v8"])
             self.assertTrue({"react", "react-dom", "next"} <= package["dependencies"].keys())
             self.assertFalse((ROOT / "typescript/bun.lock").exists())

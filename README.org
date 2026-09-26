@@ -60,7 +60,7 @@ maintenance and review resulting metadata and lock changes.
 | =ci=                   | Run =check=, default =test=, and =audit-deps=. |
 | =clean= / =clean-cache=| Remove generated artifacts / language-specific caches. |
 
-Property suites use Hypothesis (Python), fast-check (TypeScript), Rapid (Go), or
+Property suites use Hypothesis (Python), Hegel (TypeScript and Go pilot), or
 test.check (Clojure). Generated failures shrink to small counterexamples. Optional
 integration and LLM targets invoke their real runners; their documented empty-suite
 policy does not turn a runner failure into success.

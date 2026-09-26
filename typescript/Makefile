@@ -4,6 +4,9 @@ SHELL := /bin/bash
 
 # Keep the dependency store local; installed packages are not cache-cleanup targets.
 PNPM := corepack pnpm --store-dir "$(CURDIR)/.cache/pnpm/store"
+# Resolve the locked platform package, not an unrelated host engine override.
+export HEGEL_LIBHEGEL_PATH
+override HEGEL_LIBHEGEL_PATH :=
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_PACKAGE := typescript-scaffold
 VERSION_SCRIPT := scripts/release.mjs
@@ -58,7 +61,7 @@ format: ## Apply Biome formatting and safe lint fixes
 test-unit: ## Run unit tests, excluding property, integration, and LLM files
 	@$(PNPM) exec vitest run --config vitest.unit.config.ts
 
-test-property: ## Run fast-check property tests, excluding external selectors
+test-property: ## Run Hegel property tests, excluding external selectors
 	@$(PNPM) exec vitest run --config vitest.property.config.ts
 
 test-integration: ## Run integration tests; empty selector succeeds by declared policy

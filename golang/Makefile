@@ -7,6 +7,9 @@ export GOTOOLCHAIN := local
 # Build/test cache is local; the shared module download cache is never cleaned.
 export GOCACHE
 override GOCACHE := $(CURDIR)/.cache/go-build
+# [ref:go_hegel_engine] Use the local engine, not Hegel's home-cache extraction.
+export HEGEL_LIBHEGEL_PATH
+override HEGEL_LIBHEGEL_PATH := $(CURDIR)/.tools/libhegel
 
 TOOLS_BIN := $(CURDIR)/.tools/bin
 AIR := $(TOOLS_BIN)/air
@@ -27,6 +30,7 @@ doctor: ## Diagnose host prerequisites and project-local tools
 		if command -v $$command >/dev/null 2>&1; then echo "$$command: found"; else echo "$$command: missing"; fi; \
 	done
 	@go version
+	@if [ -f "$(HEGEL_LIBHEGEL_PATH)" ]; then echo "Hegel: installed"; else echo "Hegel: run make init"; fi
 	@for tool in air goose govulncheck golangci-lint; do \
 		if [ -x "$(TOOLS_BIN)/$$tool" ]; then echo "$$tool: installed"; else echo "$$tool: run make init"; fi; \
 	done
@@ -35,6 +39,7 @@ init: ## Copy .env when absent, download modules, and install pinned local tools
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example."; else echo ".env exists; not replacing it."; fi
 	@go mod download
 	@go mod verify
+	@sh scripts/setup-hegel.sh
 	@mkdir -p "$(TOOLS_BIN)"
 	@GOBIN="$(TOOLS_BIN)" go install github.com/air-verse/air@v1.61.7
 	@GOBIN="$(TOOLS_BIN)" go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
@@ -69,7 +74,7 @@ format: ## Format all Go source with gofmt
 test-unit: ## Run all ordinary ./... tests; skip TestProperty, TestIntegration, and TestLLM prefixes
 	@go test -mod=readonly ./... -run '^Test' -skip '^(TestProperty|TestIntegration|TestLLM)' $(TEST_ARGS)
 
-test-property: ## Run Rapid property tests named TestProperty across ./...
+test-property: ## Run Hegel property tests named TestProperty across ./...
 	@go test -mod=readonly ./... -run '^TestProperty' $(TEST_ARGS)
 
 test-integration: ## Invoke Go integration selector; no matching tests succeed by Go test policy
@@ -192,3 +197,4 @@ release: ## Validate then locally annotate clean standalone HEAD with current ve
 upgrade-deps: ## Deliberately update Go dependency requirements and checksums
 	@go get -u ./...
 	@go mod tidy
+	@sh scripts/setup-hegel.sh

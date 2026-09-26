@@ -3,12 +3,12 @@ package mathx
 import (
 	"testing"
 
-	"pgregory.net/rapid"
+	"hegel.dev/go/hegel"
 )
 
 func TestPropertyDoubling(t *testing.T) {
-	rapid.Check(t, func(t *rapid.T) {
-		value := rapid.IntRange(-1000000, 1000000).Draw(t, "value")
+	hegel.Test(t, func(t *hegel.T) {
+		value := hegel.Draw(t, hegel.Integers(-1000000, 1000000))
 		if got := Example(value); got != value+value {
 			t.Fatalf("Example(%d) = %d, want %d", value, got, value+value)
 		}
