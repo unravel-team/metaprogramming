@@ -26,7 +26,7 @@ TARGETS = {
     "migrate", "migrate-create", "deploy", "version", "major", "minor", "patch", "release",
 }
 IGNORE = shutil.ignore_patterns(
-    "node_modules", ".venv", ".tools", ".cpcache", ".clj-kondo", "__pycache__",
+    "node_modules", ".venv", ".tools", ".cache", ".cpcache", ".clj-kondo", "__pycache__",
     ".pytest_cache", ".ruff_cache", ".next", "coverage", "target", "dist", "bin", "tmp", ".env",
 )
 

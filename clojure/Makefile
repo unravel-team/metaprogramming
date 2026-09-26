@@ -90,8 +90,14 @@ dev: ## Run JVM HTTP server on http://0.0.0.0:8080
 clean: ## Remove local JAR, class, coverage, and Migratus artifacts
 	@rm -rf target coverage
 
-clean-cache: ## Remove only project-local Clojure CLI cache; preserve global Maven cache
-	@rm -rf .cpcache .clj-kondo/.cache
+clean-cache: ## Remove project-local CLI/linter caches; preserve global Maven cache
+	@for cache in .cpcache .clj-kondo/.cache; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	rm -rf -- .cpcache .clj-kondo/.cache
 
 infra-build: ## Build local Docker Compose services
 	@docker compose build

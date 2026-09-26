@@ -4,6 +4,9 @@ SHELL := /bin/bash
 
 # [tag:go_setup_toolchain] Pinned golangci-lint requires Go 1.26+; never auto-switch toolchains.
 export GOTOOLCHAIN := local
+# Build/test cache is local; the shared module download cache is never cleaned.
+export GOCACHE
+override GOCACHE := $(CURDIR)/.cache/go-build
 
 TOOLS_BIN := $(CURDIR)/.tools/bin
 AIR := $(TOOLS_BIN)/air
@@ -102,8 +105,15 @@ dev: ## Run development server through project-local Air on http://127.0.0.1:808
 clean: ## Remove local build, Air, and coverage artifacts
 	@rm -rf bin tmp coverage
 
-clean-cache: ## Clear Go build and test caches; preserve downloaded module cache
-	@go clean -cache -testcache
+clean-cache: ## Clear only project-local Go build/test cache; preserve module cache
+	@for cache in .cache/go-build; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	go clean -cache -testcache; \
+	rm -rf -- .cache/go-build
 
 infra-build: ## Build local Docker Compose services
 	@docker compose build

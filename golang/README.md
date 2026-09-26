@@ -64,8 +64,9 @@ make migrate-create NAME='add widgets'
 
 `make infra-down-clean` always prints data-loss warning and reads confirmation. Only
 exact `yes` removes volumes; EOF, refusal, and every other response preserve data.
-`make clean-cache` clears Go build/test caches with `go clean -cache -testcache`; it
-does not remove downloaded module cache, but affects Go cache shared by local projects.
+Make commands use project-local `GOCACHE=.cache/go-build`. `make clean-cache`
+clears only that build/test cache and rejects symlinked cache paths. Shared build
+and module caches remain untouched.
 
 ## Build, release, and deploy safety
 

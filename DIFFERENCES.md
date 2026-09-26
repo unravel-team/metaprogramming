@@ -74,12 +74,13 @@ exact `yes`; EOF, refusal, or any other response keeps local data.
 
 | Language | Build result | `clean-cache` behavior |
 |---|---|---|
-| Python | Wheel and source distribution. | Removes project test/lint/coverage caches and UV download cache. |
-| TypeScript | Next application plus staged `dist/` library JS/declarations, generated library-only manifest, and dedicated README; root app manifest stays private. | Removes `.next/cache`, local tool cache, coverage temporary files; leaves dependencies. |
-| Go | Runnable `bin/golang` Fly binary. | Runs `go clean -cache -testcache`; preserves downloaded module cache, though build/test caches may be shared by local projects. |
+| Python | Wheel and source distribution. | Uses and removes project `.cache/uv` plus pytest/Ruff caches; preserves shared UV cache. |
+| TypeScript | Next application plus staged `dist/` library JS/declarations, generated library-only manifest, and dedicated README; root app manifest stays private. | Uses local `.cache/pnpm/store`; removes that store, `.next/cache`, tool cache and coverage temporary files; leaves installed dependencies. |
+| Go | Runnable `bin/golang` Fly binary. | Uses `GOCACHE=.cache/go-build`; clears only that project build/test cache, preserving shared and module caches. |
 | Clojure | Library JAR in `target/`, never installed into local Maven. | Removes project CLI/linter cache and preserves global Maven cache. |
 
 `clean` removes generated build and coverage artifacts separately from cache cleanup.
+All `clean-cache` targets reject symlinked paths/ancestors before deleting caches.
 
 ## Versions, release, and publication
 

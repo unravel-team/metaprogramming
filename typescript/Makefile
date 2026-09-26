@@ -2,7 +2,8 @@ SHELL := /bin/bash
 .SHELLFLAGS := -Eeu -o pipefail -c
 .DEFAULT_GOAL := help
 
-PNPM := corepack pnpm
+# Keep the dependency store local; installed packages are not cache-cleanup targets.
+PNPM := corepack pnpm --store-dir "$(CURDIR)/.cache/pnpm/store"
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_PACKAGE := typescript-scaffold
 VERSION_SCRIPT := scripts/release.mjs
@@ -85,8 +86,14 @@ dev: ## Run Next development server on http://127.0.0.1:3000
 clean: ## Remove local build, coverage, and library artifacts
 	@rm -rf .next dist coverage
 
-clean-cache: ## Remove project-local Next and tool caches
-	@rm -rf .next/cache node_modules/.cache coverage/.tmp
+clean-cache: ## Remove only project-owned pnpm, Next, and tool caches
+	@for cache in .cache/pnpm/store .next/cache node_modules/.cache coverage/.tmp; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	rm -rf -- .cache/pnpm/store .next/cache node_modules/.cache coverage/.tmp
 
 infra-build: ## Build local Docker Compose services
 	@docker compose build
