@@ -42,7 +42,7 @@ them in parallel. Run `make init` first and provide network access for audit.
 
 `make dev` serves `python_scaffold.api:app`; `GET /health` returns
 `{"status":"ok"}` [ref:health-route]. `make infra-up` starts PostgreSQL with
-named `postgres_data` volume. After `make init`, both Alembic migration targets
+named `postgres_data` volume. After `make init`, all Alembic migration targets
 load `DATABASE_URL` from `.env`; an exported value takes precedence, otherwise
 Alembic uses its local default. Create revisions with:
 

@@ -17,7 +17,7 @@ VERSION_SCRIPT := scripts/release.sh
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_MODULE := example.com/golang-scaffold
 
-.PHONY: help doctor init check check-format check-deps check-vet check-lint check-tagref audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build build-air ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create deploy deploy-go version major minor patch release upgrade-deps
+.PHONY: help doctor init check check-format check-deps check-vet check-lint check-tagref audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build build-air ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create migrate-rollback migrate-status deploy deploy-go version major minor patch release upgrade-deps
 
 help: ## Show scaffold workflow targets
 	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
@@ -133,10 +133,15 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for exa
 	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
 
 migrate: ## Apply Goose migrations from DATABASE_URL or a simple .env value
+migrate-rollback: ## Roll back the latest Goose migration
+migrate-status: ## Show applied and pending Goose migrations
+
+migrate migrate-rollback migrate-status:
 	@database_url="$${DATABASE_URL:-}"; \
 	if [ -z "$$database_url" ] && [ -f .env ]; then database_url=$$(awk -F= '$$1 == "DATABASE_URL" { sub(/^[^=]*=/, ""); print; exit }' .env); fi; \
 	test -n "$$database_url" || { echo "DATABASE_URL is required; export it or set it in .env."; exit 2; }; \
-	$(GOOSE) -dir migrations postgres "$$database_url" up
+	case "$@" in migrate) action=up ;; migrate-rollback) action=down ;; migrate-status) action=status ;; esac; \
+	$(GOOSE) -dir migrations postgres "$$database_url" "$$action"
 
 migrate-create: ## Create Goose SQL migration; use NAME='describe change'
 	@test -n "$(NAME)" || { echo "NAME is required, e.g. make migrate-create NAME='add widgets'"; exit 2; }

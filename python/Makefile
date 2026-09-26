@@ -10,7 +10,7 @@ VERSION_SCRIPT := scripts/release.py
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_PACKAGE := python-scaffold
 
-.PHONY: help doctor init check check-format check-deps audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create deploy deploy-pypi version major minor patch release upgrade-deps
+.PHONY: help doctor init check check-format check-deps audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create migrate-rollback migrate-status deploy deploy-pypi version major minor patch release upgrade-deps
 
 help: ## Show scaffold workflow targets
 	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
@@ -23,7 +23,7 @@ doctor: ## Diagnose host prerequisites and synced project tools
 			echo "$$command: missing"; \
 		fi; \
 	done
-	@status=0; for command in python ruff pytest basedpyright ty bandit; do \
+	@status=0; for command in python ruff pytest basedpyright ty bandit pip-audit alembic uvicorn; do \
 		if $(UV_RUN) $$command --version >/dev/null 2>&1; then \
 			echo "$$command: found"; \
 		else \
@@ -116,6 +116,12 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for yes
 
 migrate: ## Apply Alembic migrations using .env DATABASE_URL or exported override
 	@$(UV_RUN) --env-file .env alembic upgrade head
+
+migrate-rollback: ## Roll back one Alembic revision using the same database environment
+	@$(UV_RUN) --env-file .env alembic downgrade -1
+
+migrate-status: ## Show the current Alembic database revision
+	@$(UV_RUN) --env-file .env alembic current
 
 migrate-create: ## Create Alembic revision; use MESSAGE='describe change'
 	@test -n "$(MESSAGE)" || { echo "MESSAGE is required, e.g. make migrate-create MESSAGE='add widgets'"; exit 2; }

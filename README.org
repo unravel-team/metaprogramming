@@ -84,10 +84,11 @@ After =make init=, normal dependency checks do not mutate manifests or locks:
 
 Each scaffold supplies PostgreSQL Compose template and migration target. Migration
 tools remain language-native: Alembic (Python), dbmate (TypeScript), Goose (Go),
-and Migratus (Clojure). After Python =make init=, both Alembic migration targets
+and Migratus (Clojure). After Python =make init=, all Alembic migration targets
 load =.env= through UV and an exported =DATABASE_URL= wins. =make migrate-create=
 creates a migration; Python's Alembic autogeneration also inspects the configured
-database. =make migrate= contacts that database. Clojure Migratus uses exported =DATABASE_URL=
+database. =make migrate= contacts that database. =make migrate-status= reports
+migration state; =make migrate-rollback= reverses the latest applied migration. Clojure Migratus uses exported =DATABASE_URL=
 first, otherwise a plain unquoted value from =.env= read as data without shell
 evaluation. Treat both as explicit operations.
 

@@ -67,7 +67,9 @@ and requires a successful build; it is never part of normal verification or rele
 | Clojure | JVM HTTP server on port 8080 | Migratus | Exported `DATABASE_URL` wins; otherwise reads a plain unquoted value from `.env` as data, never shell code. |
 
 `migrate-create` creates migration files; Python's Alembic autogeneration also
-inspects the configured database. `migrate` contacts that database. `infra-down-clean` prints data-loss warning and removes volumes only for
+inspects the configured database. `migrate` contacts that database.
+`migrate-status` reports migration state; `migrate-rollback` reverses the latest
+applied migration. All three operations use the same configured database. `infra-down-clean` prints data-loss warning and removes volumes only for
 exact `yes`; EOF, refusal, or any other response keeps local data.
 
 ## Artifact and cache behavior

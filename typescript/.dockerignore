@@ -1,5 +1,6 @@
 # Keep host dependencies, build output, and local secrets out of Docker context.
 node_modules/
+.cache/
 .next/
 dist/
 coverage/
