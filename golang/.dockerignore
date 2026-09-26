@@ -1,4 +1,5 @@
 .git
+.cache/
 .aider*
 .env
 .tools

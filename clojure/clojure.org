@@ -62,7 +62,7 @@ PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_LIB := clojure-scaffold
 CLOJURE_SOURCES := $(shell find src app test scripts -type f -name '*.clj' -print) build.clj
 
-.PHONY: help doctor init check check-format check-deps audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create deploy deploy-clojars version major minor patch release upgrade-deps repl repl-enrich poly check-tagref check-cljkondo
+.PHONY: help doctor init check check-format check-deps audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create migrate-rollback migrate-status deploy deploy-clojars version major minor patch release upgrade-deps repl repl-enrich poly check-tagref check-cljkondo
 
 help: ## Show scaffold workflow targets
 	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
@@ -84,9 +84,11 @@ init: ## Copy .env when absent and prefetch pinned project dependencies
 	@$(CLOJURE) -P -M:migratus
 	@$(CLOJURE) -P -M:poly
 	@$(CLOJURE) -P -M:enrich-repl
-	@$(CLOJURE) -P -X:coverage
+	@$(CLOJURE) -P -X:test:coverage
 	@$(CLOJURE) -P -M:clj-watson
 	@$(CLOJURE) -P -X:deploy-clojars
+	@$(CLOJURE) -P -M:antq
+	@$(CLOJURE) -P -M:sync-deps
 
 check-deps: ## Resolve base, test, run, and Migratus classpaths; Clojure CLI has no native lockfile
 	@$(CLOJURE) -Spath >/dev/null
@@ -172,6 +174,13 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for exa
 
 migrate: ## Apply Migratus migrations using exported or plain .env DATABASE_URL
 	@$(CLOJURE) -M:migratus -m migratus-run migrate
+
+# Reuse the runner's existing environment parser without duplicating credential handling.
+migrate-rollback: ## Roll back the latest Migratus migration
+	@$(CLOJURE) -M:migratus -e "(require 'migratus-run 'migratus.core) (migratus.core/rollback ((ns-resolve 'migratus-run 'database-config)))"
+
+migrate-status: ## Print completed and pending Migratus migrations
+	@$(CLOJURE) -M:migratus -e "(require 'migratus-run 'migratus.core) (let [config ((ns-resolve 'migratus-run 'database-config))] (prn {:completed (migratus.core/completed-list config) :pending (migratus.core/pending-list config)}))"
 
 migrate-create: ## Create Migratus migration files; use NAME='describe change'
 	@test -n "$(NAME)" || { echo "NAME is required, e.g. make migrate-create NAME='add widgets'"; exit 2; }

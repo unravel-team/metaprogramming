@@ -8,7 +8,7 @@ PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_PACKAGE := typescript-scaffold
 VERSION_SCRIPT := scripts/release.mjs
 
-.PHONY: help doctor init check check-format check-deps audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create deploy deploy-npm version major minor patch release upgrade-deps check-lint check-types check-knip check-jscpd check-tagref
+.PHONY: help doctor init check check-format check-deps audit-deps format test test-unit test-property test-integration test-llm test-all test-coverage build ci dev clean clean-cache infra-build infra-up infra-down infra-logs infra-down-clean migrate migrate-create migrate-rollback migrate-status deploy deploy-npm version major minor patch release upgrade-deps check-lint check-types check-knip check-jscpd check-tagref
 
 help: ## Show scaffold workflow targets
 	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
@@ -27,7 +27,7 @@ init: ## Copy .env when absent and install locked pnpm dependencies
 	@$(PNPM) install --frozen-lockfile
 
 check-deps: ## Verify package manifest matches frozen lock without installing
-	@$(PNPM) install --frozen-lockfile --lockfile-only
+	@$(PNPM) install --frozen-lockfile --lockfile-only --ignore-scripts
 
 check-format: ## Check Biome formatting without rewriting files
 	@$(PNPM) exec biome format src tests scripts *.config.ts package.json tsconfig*.json next-env.d.ts
@@ -114,6 +114,12 @@ infra-down-clean: ## Prompt, then remove local services and volumes only for yes
 
 migrate: ## Apply dbmate migrations using DATABASE_URL
 	@$(PNPM) exec dbmate --migrations-dir db/migrations up
+
+migrate-rollback: ## Roll back the latest dbmate migration using DATABASE_URL
+	@$(PNPM) exec dbmate --migrations-dir db/migrations down
+
+migrate-status: ## Show applied and pending dbmate migrations
+	@$(PNPM) exec dbmate --migrations-dir db/migrations status
 
 migrate-create: ## Create migration; use MESSAGE='describe change'
 	@test -n "$(MESSAGE)" || { echo "MESSAGE is required, e.g. make migrate-create MESSAGE='add widgets'"; exit 2; }
