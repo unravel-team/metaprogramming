@@ -59,7 +59,9 @@ networked audit after offline checks and default tests.
 
 `make version` prints plain semantic version from `VERSION`. `make major`,
 `make minor`, and `make patch` change only that metadata with normal semver reset
-rules; they never commit, tag, or push. `make release` validates and creates only
+rules; they never commit, tag, or push. These targets call the matching native
+`build.clj` tasks (`clojure -Srepro -T:build version`, `major`, `minor`, or `patch`),
+sharing version validation with JAR/POM generation. `make release` validates and creates only
 a local annotated `vVERSION` tag when this copied directory is clean standalone
 Git root. It rejects nested scaffold copies, preventing tags in a containing
 repository. `make deploy-clojars` additionally requires a unique library

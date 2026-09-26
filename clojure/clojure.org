@@ -6,7 +6,7 @@
 * Clojure scaffold workflow
 
 This Org file is canonical source for generated Clojure scaffold workflow,
-configuration, app code, release helper, and documentation. Edit its blocks,
+configuration, app code, native build tasks, and documentation. Edit its blocks,
 then run Org Babel tangle and require byte-for-byte parity before committing.
 =VERSION= deliberately has no source block: version bump targets modify it, and
 tangling must not revert that metadata.
@@ -57,7 +57,6 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 CLOJURE := clojure -Srepro
-VERSION_SCRIPT := scripts/release.sh
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_LIB := clojure-scaffold
 CLOJURE_SOURCES := $(shell find src app test scripts -type f -name '*.clj' -print) build.clj
@@ -199,7 +198,7 @@ deploy-clojars: ## Publish current JAR only from exact clean standalone annotate
 	lib=$$($(CLOJURE) -T:build library-name); \
 	if [ -z "$$lib" ] || [ "$${lib##*/}" = "$(PLACEHOLDER_LIB)" ]; then echo "Set a unique build.clj library identity before publishing."; exit 2; fi; \
 	if [ -z "$${CLOJARS_USERNAME:-}" ] || [ -z "$${CLOJARS_PASSWORD:-}" ]; then echo "CLOJARS_USERNAME and CLOJARS_PASSWORD are required."; exit 2; fi; \
-	version=$$($(VERSION_SCRIPT) version); tag="v$$version"; \
+	version=$$($(CLOJURE) -T:build version); tag="v$$version"; \
 	git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }
 	@$(MAKE) --no-print-directory build
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
@@ -208,16 +207,16 @@ deploy-clojars: ## Publish current JAR only from exact clean standalone annotate
 	$(CLOJURE) -X:deploy-clojars :installer :remote :artifact "\"$$artifact\"" :pom-file "\"$$pom_file\"" :sign-releases? false
 
 version: ## Print plain semantic version
-	@$(VERSION_SCRIPT) version
+	@$(CLOJURE) -T:build version
 
 major: ## Bump major version metadata only
-	@$(VERSION_SCRIPT) major
+	@$(CLOJURE) -T:build major
 
 minor: ## Bump minor version metadata only
-	@$(VERSION_SCRIPT) minor
+	@$(CLOJURE) -T:build minor
 
 patch: ## Bump patch version metadata only
-	@$(VERSION_SCRIPT) patch
+	@$(CLOJURE) -T:build patch
 
 release: ## Validate then locally annotate clean standalone HEAD with current version
 	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Release requires standalone Git repository."; exit 2; }; \
@@ -225,7 +224,7 @@ release: ## Validate then locally annotate clean standalone HEAD with current ve
 	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Release requires clean committed state."; exit 2; fi
 	@$(MAKE) --no-print-directory build
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
-	@version=$$($(VERSION_SCRIPT) version); tag="v$$version"; \
+	@version=$$($(CLOJURE) -T:build version); tag="v$$version"; \
 	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
 	git tag --annotate "$$tag" --message "Release $$tag"
 
@@ -321,7 +320,7 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
 (def class-dir "target/classes")
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 
-(defn version
+(defn- read-version
   []
   (let [value (str/trim (slurp "VERSION"))]
     (when-not (re-matches #"\d+\.\d+\.\d+" value)
@@ -329,7 +328,26 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
                       {:value value})))
     value))
 
-(defn jar-file [] (format "target/%s-%s.jar" (name lib) (version)))
+(defn version [_] (println (read-version)))
+
+(defn- bump-version!
+  [component]
+  (let [[major minor patch] (mapv bigint (str/split (read-version) #"\."))
+        bumped (case component
+                 :major [(inc major) 0 0]
+                 :minor [major (inc minor) 0]
+                 :patch [major minor (inc patch)])
+        value (str/join "." bumped)]
+    (spit "VERSION" (str value "\n"))
+    (println value)))
+
+(defn major [_] (bump-version! :major))
+
+(defn minor [_] (bump-version! :minor))
+
+(defn patch [_] (bump-version! :patch))
+
+(defn jar-file [] (format "target/%s-%s.jar" (name lib) (read-version)))
 
 (defn pom-file
   []
@@ -367,7 +385,7 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
   (b/copy-dir {:src-dirs ["src"], :target-dir class-dir})
   (b/write-pom {:class-dir class-dir,
                 :lib lib,
-                :version (version),
+                :version (read-version),
                 :basis @basis,
                 :src-dirs ["src"]})
   (b/jar {:class-dir class-dir, :jar-file (jar-file)})
@@ -378,10 +396,10 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
   (jar nil)
   (b/install {:basis @basis,
               :lib lib,
-              :version (version),
+              :version (read-version),
               :jar-file (jar-file),
               :class-dir class-dir})
-  (println (format "Installed %s %s locally" lib (version))))
+  (println (format "Installed %s %s locally" lib (read-version))))
 
 (defn deploy [_] (run-command! ["make" "deploy-clojars"]))
 #+end_src
@@ -536,43 +554,6 @@ poly: ## Run Polylith only in a workspace containing workspace.edn
   (let [org-file (io/file "clojure.org")
         deps-file (io/file "deps.edn")]
     (spit org-file (synchronize (slurp org-file) (slurp deps-file)))))
-#+end_src
-** scripts/release.sh
-
-#+begin_src shell :tangle "scripts/release.sh"
-#!/usr/bin/env bash
-set -Eeuo pipefail
-
-version_file="VERSION"
-
-read_version() {
-  local version
-  version="$(tr -d '[:space:]' < "$version_file")"
-  if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "VERSION must contain plain semantic version." >&2
-    exit 2
-  fi
-  printf '%s\n' "$version"
-}
-
-bump() {
-  local kind="$1" major minor patch
-  IFS=. read -r major minor patch < <(read_version)
-  case "$kind" in
-    major) major=$((major + 1)); minor=0; patch=0 ;;
-    minor) minor=$((minor + 1)); patch=0 ;;
-    patch) patch=$((patch + 1)) ;;
-    *) echo "Expected major, minor, or patch." >&2; exit 2 ;;
-  esac
-  printf '%s.%s.%s\n' "$major" "$minor" "$patch" > "$version_file"
-  cat "$version_file"
-}
-
-case "${1:-}" in
-  version) read_version ;;
-  major|minor|patch) bump "$1" ;;
-  *) echo "Usage: $0 {version|major|minor|patch}" >&2; exit 2 ;;
-esac
 #+end_src
 ** migratus.edn
 
@@ -767,7 +748,9 @@ networked audit after offline checks and default tests.
 
 `make version` prints plain semantic version from `VERSION`. `make major`,
 `make minor`, and `make patch` change only that metadata with normal semver reset
-rules; they never commit, tag, or push. `make release` validates and creates only
+rules; they never commit, tag, or push. These targets call the matching native
+`build.clj` tasks (`clojure -Srepro -T:build version`, `major`, `minor`, or `patch`),
+sharing version validation with JAR/POM generation. `make release` validates and creates only
 a local annotated `vVERSION` tag when this copied directory is clean standalone
 Git root. It rejects nested scaffold copies, preventing tags in a containing
 repository. `make deploy-clojars` additionally requires a unique library
