@@ -180,12 +180,22 @@ esac''')
             tangle(dest, "clojure")
             self.assertEqual((dest / "deps.edn").read_bytes(), before)
 
-    def test_editor_does_not_invoke_bare_zprint(self):
+    @unittest.skipUnless(shutil.which("emacs"), "Emacs required")
+    def test_editor_selects_user_zprint_formatter(self):
         if "clojure" not in LANGUAGES:
             self.skipTest("Clojure only")
-        config = ROOT / "clojure/.dir-locals.el"
-        if config.exists():
-            self.assertNotIn("apheleia-formatter . (zprint)", config.read_text())
+        result = run(["emacs", "--batch", "-Q", "--eval", '''
+(with-temp-buffer
+  (insert-file-contents ".dir-locals.el")
+  (let ((settings (read (current-buffer))))
+    (dolist (mode '(clojure-mode clojure-ts-mode clojurec-mode
+                    clojurec-ts-mode clojurescript-mode clojurescript-ts-mode
+                    clojure-dart-ts-mode clojure-jank-ts-mode))
+      (unless (equal (cdr (assq 'apheleia-formatter (cdr (assq mode settings))))
+                     '(zprint))
+        (error "Missing zprint formatter for %s" mode)))))
+'''], ROOT / "clojure")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     @unittest.skipUnless(shutil.which("clojure"), "Clojure required")
     def test_coverage_names_deployed_clojure_app(self):
