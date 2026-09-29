@@ -1,0 +1,3 @@
+# Org contains source copies of generated files; scan checked-in outputs only.
+ignore_rules:
+  - /clojure.org

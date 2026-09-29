@@ -1,6 +1,6 @@
-"""Main application module."""
+"""Small library API retained by the scaffold example tests."""
 
 
-def example(x: int) -> int:
-    """Example function."""
-    return x * 2
+def example(value: int) -> int:
+    """Return twice supplied integer."""
+    return value * 2

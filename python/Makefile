@@ -1,405 +1,233 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
-
-# Set bash instead of sh for the @if [[ conditions,
-# and use the usual safety flags:
-SHELL = /bin/bash -Eeu
-
+SHELL := /bin/bash
+.SHELLFLAGS := -Eeu -o pipefail -c
 .DEFAULT_GOAL := help
 
+# Keep setup and normal commands on the same project-owned cache.
+export UV_CACHE_DIR
+override UV_CACHE_DIR := $(CURDIR)/.cache/uv
+UV_RUN := uv run --no-sync
+VERSION_SCRIPT := scripts/release.py
+PLACEHOLDER_APP := replace-with-your-fly-app-name
+PLACEHOLDER_PACKAGE := python-scaffold
+
 .PHONY: help
-help:    ## A brief listing of all available commands
-	@awk '/^[a-zA-Z0-9_-]+:.*##/ { \
-		printf "%-25s # %s\n", \
-		substr($$1, 1, length($$1)-1), \
-		substr($$0, index($$0,"##")+3) \
-	}' $(MAKEFILE_LIST)
+help: ## Show scaffold workflow targets
+	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
 
 .PHONY: doctor
-doctor: ## Verify toolchain prerequisites
-	@for cmd in python3 uv ruff pytest basedpyright bandit tagref dafny; do \
-		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+doctor: ## Diagnose host prerequisites and synced project tools
+	@for command in uv docker flyctl tagref; do \
+		if command -v $$command >/dev/null 2>&1; then \
+			echo "$$command: found"; \
+		else \
+			echo "$$command: missing"; \
+		fi; \
 	done
-	@echo "Python scaffold ready."
+	@status=0; for command in python ruff pytest basedpyright ty bandit pip-audit alembic uvicorn; do \
+		if $(UV_RUN) $$command --version >/dev/null 2>&1; then \
+			echo "$$command: found"; \
+		else \
+			echo "$$command: missing or project is not initialized"; status=1; \
+		fi; \
+	done; exit $$status
 
 .PHONY: init
-init: venv install-ruff install-pytest install-basedpyright install-tagref install-bandit .gitignore install-dafny install-hooks ## Bootstrap dependencies and setup
+init: ## Create .env when absent and install locked dependencies
+	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example."; else echo ".env exists; not replacing it."; fi
+	@uv sync --locked
 
-.env.example:
-	touch .env.example
+.PHONY: check-deps
+check-deps: ## Verify dependency metadata matches UV lock
+	@uv lock --check
 
-.env: .env.example
-	@if [ ! -f .env ]; then \
-		echo "Creating .env from .env.example..."; \
-		cp .env.example .env; \
-		echo "✓ .env created. Please edit it with your actual values."; \
-	else \
-		echo ".env already exists, skipping..."; \
-	fi
-
-pyproject.toml:
-	@if [ ! -f pyproject.toml ]; then \
-		echo "Creating pyproject.toml..."; \
-		echo '[build-system]' > pyproject.toml; \
-		echo 'requires = ["hatchling"]' >> pyproject.toml; \
-		echo 'build-backend = "hatchling.build"' >> pyproject.toml; \
-		echo '' >> pyproject.toml; \
-		echo '[project]' >> pyproject.toml; \
-		echo 'name = "metapy"' >> pyproject.toml; \
-		echo 'version = "0.1.0"' >> pyproject.toml; \
-		echo 'description = ""' >> pyproject.toml; \
-		echo 'authors = []' >> pyproject.toml; \
-		echo 'keywords = []' >> pyproject.toml; \
-		echo 'packages = [{include="src"}]' >> pyproject.toml; \
-	    echo 'requires-python = ">=3.14.0"' >> pyproject.toml; \
-		echo '' >> pyproject.toml; \
-	fi
-
-tests:
-	mkdir tests
-
-src:
-	mkdir -p src/metapy && touch src/metapy/__init__.py
-
-.venv: pyproject.toml tests src
-	uv venv
-	uv lock
-	uv sync --locked --no-cache
-
-.PHONY: venv
-venv: .venv .env
-	@echo "Virtual environment created at .venv/"
-
-.PHONY: install-ruff
-install-ruff: pyproject.toml
-	uv add ruff --group dev
-	@if ! grep -q "\[tool.ruff.lint\]" pyproject.toml; then \
-		echo '' >> pyproject.toml; \
-		echo '[tool.ruff.lint]' >> pyproject.toml; \
-		echo 'select = [' >> pyproject.toml; \
-		echo '    # pycodestyle' >> pyproject.toml; \
-		echo '    "E",' >> pyproject.toml; \
-		echo '    # Pyflakes' >> pyproject.toml; \
-		echo '    "F",' >> pyproject.toml; \
-		echo '    # pyupgrade' >> pyproject.toml; \
-		echo '    "UP",' >> pyproject.toml; \
-		echo '    # flake8-bugbear' >> pyproject.toml; \
-		echo '    "B",' >> pyproject.toml; \
-		echo '    # flake8-simplify' >> pyproject.toml; \
-		echo '    "SIM",' >> pyproject.toml; \
-		echo '    # isort' >> pyproject.toml; \
-		echo '    "I",' >> pyproject.toml; \
-		echo ']' >> pyproject.toml; \
-		echo 'ignore = ["E501"]' >> pyproject.toml; \
-	fi
-
-.PHONY: install-pytest
-install-pytest: pyproject.toml
-	uv add pytest pytest-asyncio --group dev
-	@if ! grep -q "\[tool.pytest.ini_options\]" pyproject.toml; then \
-		echo '' >> pyproject.toml; \
-		echo '[tool.pytest.ini_options]' >> pyproject.toml; \
-		echo 'testpaths = ["tests"]' >> pyproject.toml; \
-		echo 'addopts = "-v --tb=short"' >> pyproject.toml; \
-		echo 'asyncio_mode = "auto"' >> pyproject.toml; \
-		echo 'log_cli = true' >> pyproject.toml; \
-		echo 'log_cli_level = "INFO"' >> pyproject.toml; \
-		echo 'log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"' >> pyproject.toml; \
-		echo 'asyncio_default_fixture_loop_scope = "function"' >> pyproject.toml; \
-	fi
-
-.PHONY: install-ty
-install-ty:
-	uv add ty --group dev
-
-.PHONY: install-basedpyright
-install-basedpyright: pyproject.toml
-	uv add basedpyright --group dev
-	@if ! grep -q "\[tool.basedpyright\]" pyproject.toml; then \
-		echo '' >> pyproject.toml; \
-		echo '[tool.basedpyright]' >> pyproject.toml; \
-		echo 'reportAny = false' >> pyproject.toml; \
-		echo 'reportExplicitAny = false' >> pyproject.toml; \
-		echo 'reportUnknownMemberType = false' >> pyproject.toml; \
-		echo 'reportUnknownArgumentType = false' >> pyproject.toml; \
-		echo 'reportUnknownVariableType = false' >> pyproject.toml; \
-		echo 'reportUnknownLambdaType = false' >> pyproject.toml; \
-	fi
-
-.PHONY: install-tagref
-install-tagref:
-	@if ! command -v tagref >/dev/null 2>&1; then \
-		echo "tagref executable not found. Please install it from https://github.com/stepchowfun/tagref?tab=readme-ov-file#installation-instructions"; \
-		exit 1; \
-	fi
-
-.PHONY: install-bandit
-install-bandit:
-	uv tool install bandit
-
-.PHONY: install-dafny
-install-dafny:
-	@command -v brew >/dev/null 2>&1 && brew install dafny || \
-	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
-	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
-
-.git/hooks/pre-push:
-	@echo "Setting up Git hooks..."
-	@cat > .git/hooks/pre-push << 'EOF'
-	#!/bin/sh
-
-	# Redirect output to stderr for visibility
-	exec 1>&2
-
-	echo "Running pre-push checks..."
-
-	echo "Running make check (lints/static analysis)"
-
-	if ! make check; then
-	echo "❌ make check failed. Aborting push."
-	echo "   Fix the issues and try again."
-	exit 1
-	fi
-
-	echo "Running make format (auto-formatting)"
-	if ! make format; then
-	echo "❌ make format failed. Aborting push."
-	exit 1
-	fi
-
-	echo "Checking for uncommitted changes after formatting"
-	if ! git diff --exit-code --quiet; then
-	echo "⚠️  Code was reformatted by 'make format'!"
-	echo "   Please commit these changes before pushing."
-	exit 1
-	fi
-
-	echo "Running make test (unit tests)"
-	if ! make test; then
-	echo "❌ make test failed. Aborting push."
-	echo "   Fix the test failures and try again."
-	exit 1
-	fi
-
-	echo "✅ All checks passed. Pushing changes..."
-	exit 0
-	EOF
-	@chmod +x .git/hooks/pre-push
-	@echo "✅ Git hooks installed successfully!"
-
-.PHONY: install-hooks
-install-hooks: .git/hooks/pre-push
-
-AGENTS.md:
-	@echo "Download the CONVENTIONS.md file from the [[https://github.com/unravel-team/metapy][metapy]] project, then symlink it to AGENTS.md and CLAUDE.md"
-
-.aider.conf.yml:
-	@echo "Download the .aider.conf.yml file from the [[https://github.com/unravel-team/metapy][metapy]] project"
-
-.gitignore:
-	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metapy][metapy]] project"
-
-.PHONY: check-bandit
-check-bandit:
-	bandit -q -ii -lll -c .bandit.yml -r src/
-
-.PHONY: check-tagref
-check-tagref: install-tagref
-	tagref
-
-.PHONY: check-uv
-check-uv:
-	uv lock --check
+.PHONY: check-format
+check-format: ## Check Ruff formatting without rewriting files
+	@$(UV_RUN) ruff format --check src tests scripts alembic migrations
 
 .PHONY: check-ruff
-check-ruff:
-	uv run ruff check -n src tests
+check-ruff: ## Lint source, tests, release helper, and Alembic files
+	@$(UV_RUN) ruff check src tests scripts alembic migrations
 
 .PHONY: check-ty
-check-ty:
-	uv run ty check src tests
+check-ty: ## Run Ty type checks on shipped source and tests
+	@$(UV_RUN) ty check src tests
 
 .PHONY: check-basedpyright
-check-basedpyright:
-	uv run basedpyright src tests
+check-basedpyright: ## Run BasedPyright using the source scope in pyproject.toml
+	@$(UV_RUN) basedpyright
 
-.PHONY: check-dafny
-check-dafny:
-	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
-		dafny verify contracts/*.dfy; \
-	else \
-		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
-	fi
+.PHONY: check-bandit
+check-bandit: ## Scan application source for common security issues
+	@$(UV_RUN) bandit -q -ii -lll -c .bandit.yml -r src
+
+.PHONY: check-tagref
+check-tagref: ## Verify documented source references
+	@tagref
 
 .PHONY: check
-check: check-uv check-ruff check-tagref check-ty check-bandit check-basedpyright check-dafny    ## Check that the code is well linted, well typed, well documented. Fast checks first, slow later
-	@echo "All checks passed!"
+check: check-deps check-format check-ruff check-ty check-basedpyright check-bandit check-tagref ## Run offline quality checks
+
+.PHONY: audit-deps
+audit-deps: ## Query package advisories; requires network access
+	@$(UV_RUN) pip-audit
 
 .PHONY: format
-format:  ## Format the code using ruff
-	uv run ruff check -n --fix
-	uv run ruff format
-
-.PHONY: megalinter
-megalinter:
-	docker run --rm -v "$(HERE):/tmp/lint" oxsecurity/megalinter:v8
+format: ## Apply Ruff lint fixes and formatting
+	@$(UV_RUN) ruff check --fix src tests scripts alembic migrations
+	@$(UV_RUN) ruff format src tests scripts alembic migrations
 
 .PHONY: test-unit
-test-unit:
-	uv run pytest -m "unit"
+test-unit: ## Run unit tests; exclude property, integration, and LLM selectors
+	@$(UV_RUN) pytest -m "unit and not property and not integration and not llm"
 
-.PHONY: test-llm
-test-llm:
-	uv run pytest -m "llm"
+.PHONY: test-property
+test-property: ## Run Hypothesis property tests; exclude external selectors
+	@$(UV_RUN) pytest -m "property and not integration and not llm"
 
 .PHONY: test-integration
-test-integration:
-	uv run pytest -m "integration"
+test-integration: ## Run integration selector; empty suite is declared skipped
+	@set +e; $(UV_RUN) pytest -m "integration"; status=$$?; set -e; \
+	if [ $$status -eq 5 ]; then echo "No integration tests selected; skipped by scaffold policy."; exit 0; fi; \
+	exit $$status
+
+.PHONY: test-llm
+test-llm: ## Run LLM selector; empty suite is declared skipped
+	@set +e; $(UV_RUN) pytest -m "llm"; status=$$?; set -e; \
+	if [ $$status -eq 5 ]; then echo "No LLM tests selected; skipped by scaffold policy."; exit 0; fi; \
+	exit $$status
 
 .PHONY: test
-test: test-unit    ## Run unit tests
+test: test-unit test-property ## Run default unit and property test suites
+
+.PHONY: test-all
+test-all: ## Run complete pytest suite, including integration and LLM tests
+	@$(UV_RUN) pytest
+
+.PHONY: test-coverage
+test-coverage: ## Write terminal, XML, and HTML coverage for default suites
+	@$(UV_RUN) pytest -m "(unit or property) and not integration and not llm" --cov=python_scaffold --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:coverage
 
 .PHONY: build
-build: check     ## Build the deployment artifact
-	uv build
+build: check test ## Validate then build wheel and source distribution
+	@uv build
 
-.PHONY: docker-build
-docker-build:  # Build the FastAPI server Dockerfile
-	docker build -f Dockerfile -t metapy:latest -t metapy:$$(git rev-parse --short HEAD) .
+.PHONY: ci
+ci: check test audit-deps ## Run quality checks, default tests, and network audit
+
+.PHONY: dev
+dev: ## Run FastAPI with reload on http://127.0.0.1:8000
+	@$(UV_RUN) uvicorn python_scaffold.api:app --host 0.0.0.0 --port 8000 --reload
 
 .PHONY: infra-build
-infra-build:  ## Build all the local infra (docker-compose)
-	docker compose build
+infra-build: ## Build local Docker Compose services
+	@docker compose build
 
 .PHONY: infra-up
-infra-up:   ## Bring up all the local infra (docker-compose) and synthetic data
-	docker compose up
+infra-up: ## Start local PostgreSQL with named data volume
+	@docker compose up -d
 
 .PHONY: infra-down
-infra-down:       ## Bring down all the local infra (docker-compose)
-	docker compose down
+infra-down: ## Stop local Docker Compose services
+	@docker compose down
 
 .PHONY: infra-logs
-infra-logs:
-	docker compose logs
+infra-logs: ## Follow local Docker Compose service logs
+	@docker compose logs -f
 
 .PHONY: infra-down-clean
-infra-down-clean:
-	@echo "Warning: Deleting volumes will lead to data loss. You will start from scratch and this may introduce bugs (e.g., if your code does not work with existing data in postgres)."
-	@read -p "Are you sure you want to proceed? (yes/no): " confirm; \
-	if [ "$$confirm" = "yes" ]; then \
-		docker compose down -v; \
-		echo "Volumes deleted."; \
-	else \
-		echo "Aborted."; \
-	fi
+infra-down-clean: ## Prompt, then remove local services and volumes only for yes
+	@echo "Warning: removing volumes permanently deletes local PostgreSQL data."
+	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
+	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
 
 .PHONY: migrate
-migrate:    ## Run database migrations (using Alembic)
-	uv run python -m alembic upgrade head
+migrate: ## Apply Alembic migrations using .env DATABASE_URL or exported override
+	@$(UV_RUN) --env-file .env alembic upgrade head
 
-.PHONY: server
-server:    ## Run the FastAPI server locally
-	ENABLE_TRACING=true uv run -m unravel.fastapi.main
+.PHONY: migrate-rollback
+migrate-rollback: ## Roll back one Alembic revision using the same database environment
+	@$(UV_RUN) --env-file .env alembic downgrade -1
 
-.PHONY: backup-current-image
-backup-current-image:
-	@echo "Backing up currently running image..."
-	@if [ -f .fly_image ]; then \
-		mv .fly_image .fly_image.backup; \
-		echo "✅ Backed up current .fly_image to .fly_image.backup"; \
-	fi
+.PHONY: migrate-status
+migrate-status: ## Show the current Alembic database revision
+	@$(UV_RUN) --env-file .env alembic current
 
-.fly_image:
-	@IMAGE=$$(flyctl image show --app metapy | awk 'NR>2 && NF>0 {print $$2"/"$$3":"$$4; exit}'); \
-	echo "$$IMAGE" > .fly_image; \
-	echo "✅ Current production image saved: $$IMAGE"
-
-.PHONY: tag-deploy-internal
-tag-deploy-internal: .fly_image
-	@if [ -f .can_tag ]; then \
-		TAG="fly-$$(date +%Y-%m-%d)"; \
-		IMAGE=$$(cat .fly_image); \
-		if git tag -m "$$(printf 'image: %s' "$$IMAGE")" "$$TAG" 2>/dev/null; then \
-			echo "✅ Tagged current commit as $$TAG"; \
-			rm .can_tag; \
-		else \
-			echo "⚠️  Tag $$TAG already exists, skipping tag creation"; \
-			echo "Image: $$IMAGE"; \
-		fi; \
-	fi
-
-.PHONY: deploy-internal
-deploy-internal:
-	@echo "Deploying to production..."
-	@if flyctl deploy --config fly.toml; then \
-		echo "✅ Deployment successful!"; \
-	    touch .can_tag; \
-	else \
-		echo "❌ Deployment failed!"; \
-		if [ -f .fly_image.backup ]; then \
-			echo "Working image in: .fly_image.backup"; \
-		fi; \
-		exit 1; \
-	fi
+.PHONY: migrate-create
+migrate-create: ## Create Alembic revision; use MESSAGE='describe change'
+	@test -n "$(MESSAGE)" || { echo "MESSAGE is required, e.g. make migrate-create MESSAGE='add widgets'"; exit 2; }
+	@$(UV_RUN) --env-file .env alembic revision --autogenerate -m "$(MESSAGE)"
 
 .PHONY: deploy
-deploy: build backup-current-image deploy-internal tag-deploy-internal    ## Deploy with backup and auto-tagging
+deploy: build ## Deploy to Fly only after app identity is customized
+	@app_name=$$(awk -F '"' '/^app = / { print $$2; exit }' fly.toml); \
+	if [ -z "$$app_name" ] || [ "$$app_name" = "$(PLACEHOLDER_APP)" ]; then \
+		echo "Set a unique app name in fly.toml before deploy."; exit 2; \
+	fi; \
+	flyctl deploy --config fly.toml
 
-.PHONY: rollback
-rollback:  # Rollback to the previous version stored in backup
-	@if [ ! -f .fly_image.backup ]; then \
-		echo "❌ No backup image found (.fly_image.backup missing)"; \
-		echo "Cannot rollback without a backup image."; \
-		exit 1; \
-	fi
-	@BACKUP_IMAGE=$$(cat .fly_image.backup); \
-	echo "Rolling back to: $$BACKUP_IMAGE"; \
-	if flyctl deploy --config fly.toml --image "$$BACKUP_IMAGE"; then \
-		if [ -f .fly_image ]; then \
-			BAD_DEPLOY_IMAGE=$$(cat .fly_image); \
-			echo "Overwriting bad deploy image: $$BAD_DEPLOY_IMAGE"; \
-		fi; \
-		mv .fly_image.backup .fly_image; \
-		echo "✅ Rollback successful! Restored to: $$BACKUP_IMAGE"; \
-	else \
-		echo "❌ Rollback failed!"; \
-		exit 1; \
-	fi
+.PHONY: deploy-pypi
+deploy-pypi: ## Build and publish current artifacts only from exact clean release tag
+	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Publishing requires standalone Git repository."; exit 2; }; \
+	[ "$$root" = "$$(pwd -P)" ] || { echo "Publishing must run from standalone project root."; exit 2; }; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Publishing requires clean committed state."; exit 2; fi; \
+	package_name=$$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["name"])'); \
+	package_identity=$$(python3 -c 'import re, sys; print(re.sub(r"[-_.]+", "-", sys.argv[1]).lower())' "$$package_name"); \
+	version=$$(python3 $(VERSION_SCRIPT) version); \
+	if [ "$$package_identity" = "$(PLACEHOLDER_PACKAGE)" ]; then echo "Set unique project.name before publishing."; exit 2; fi; \
+	if [ -z "$${UV_PUBLISH_TOKEN:-}" ]; then echo "UV_PUBLISH_TOKEN is required."; exit 2; fi; \
+	tag="v$$version"; git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }; \
+	rm -rf dist; \
+	$(MAKE) --no-print-directory build; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi; \
+	distribution=$$(python3 -c 'import re, tomllib; name=tomllib.load(open("pyproject.toml", "rb"))["project"]["name"]; print(re.sub(r"[-_.]+", "-", name).lower().replace("-", "_"))'); \
+	sdist="dist/$$distribution-$$version.tar.gz"; wheel="dist/$$distribution-$$version-py3-none-any.whl"; \
+	test -f "$$sdist" && test -f "$$wheel" || { echo "Expected current-version distribution artifacts are missing."; exit 2; }; \
+	uv publish "$$sdist" "$$wheel"
 
-.PHONY: deploy-build-only
-deploy-build-only:
-	flyctl deploy --config fly.toml --build-only
-	@echo "✅ Build-only Deploy complete! Please update .fly_image manually!"
+.PHONY: version
+version: ## Print semantic package version
+	@python3 $(VERSION_SCRIPT) version
 
-.PHONY: prepare
-prepare: Build the latest code and upload image to fly.io. Useful in hot-swap and migration situations
+.PHONY: major
+major: ## Bump major version metadata only
+	@python3 $(VERSION_SCRIPT) major
 
-.PHONY: deploy-reuse-image
-deploy-reuse-image: Deploy only config changes to production, reusing the latest image
-	@echo "Deploying config-only changes..."
-	@IMAGE=$$(cat .fly_image); \
-	echo "Using current production image: $$IMAGE"; \
-	if flyctl deploy --config fly.toml --image "$$IMAGE"; then \
-		echo "✅ Config deployment successful!"; \
-	else \
-		echo "❌ Config deployment failed!"; \
-		exit 1; \
-	fi
+.PHONY: minor
+minor: ## Bump minor version metadata only
+	@python3 $(VERSION_SCRIPT) minor
+
+.PHONY: patch
+patch: ## Bump patch version metadata only
+	@python3 $(VERSION_SCRIPT) patch
+
+.PHONY: release
+release: ## Validate then tag clean standalone HEAD with local annotated version
+	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Release requires standalone Git repository."; exit 2; }; \
+	[ "$$root" = "$$(pwd -P)" ] || { echo "Release must run from standalone project root."; exit 2; }; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Release requires clean committed state."; exit 2; fi; \
+	$(MAKE) --no-print-directory build; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi; \
+	version=$$(python3 $(VERSION_SCRIPT) version); tag="v$$version"; \
+	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
+	git tag --annotate "$$tag" --message "Release $$tag"
 
 .PHONY: upgrade-deps
-upgrade-deps:    ## Upgrade all dependencies to their latest versions
-	uv sync --upgrade
-
-.PHONY: clean-cache
-clean-cache: Clean UV Cache (only needed in extreme conditions)
-	@echo "Cleaning cache! This removes all downloaded deps!"
-	uv cache clean
+upgrade-deps: ## Deliberately update dependency constraints and UV lock
+	@uv lock --upgrade
+	@uv sync
 
 .PHONY: clean
-clean:     ## Delete any existing artifacts
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	rm -rf build/
-	rm -rf dist/
-	rm -rf *.egg-info/
+clean: ## Remove local build, coverage, and Python bytecode artifacts
+	@rm -rf build dist coverage coverage.xml .coverage
+	@find . -type d -name __pycache__ -prune -exec rm -rf {} +
+	@find . -type f -name '*.py[co]' -delete
+
+.PHONY: clean-cache
+clean-cache: ## Remove only project-owned UV, pytest, and Ruff caches
+	@for cache in .cache/uv .pytest_cache .ruff_cache; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	rm -rf -- .cache/uv .pytest_cache .ruff_cache

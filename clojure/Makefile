@@ -1,339 +1,232 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
-CLOJURE_SOURCES := $(shell find . -name '**.clj' -not -path './.clj-kondo/*' -not -path './target/*' -not -path './projects/*/target/*')
-
-# Set bash instead of sh for the @if [[ conditions,
-# and use the usual safety flags:
-SHELL = /bin/bash -Eeu
-
+SHELL := /bin/bash
+.SHELLFLAGS := -Eeu -o pipefail -c
 .DEFAULT_GOAL := help
 
-help:    ## A brief explanation of everything you can do
-	@awk '/^[a-zA-Z0-9_-]+:.*##/ { \
-		printf "%-25s # %s\n", \
-		substr($$1, 1, length($$1)-1), \
-		substr($$0, index($$0,"##")+3) \
-	}' $(MAKEFILE_LIST)
+CLOJURE := clojure -Srepro
+PLACEHOLDER_APP := replace-with-your-fly-app-name
+PLACEHOLDER_LIB := clojure-scaffold
+CLOJURE_SOURCES := $(shell find src app test scripts -type f -name '*.clj' -print) build.clj
+
+.PHONY: help
+help: ## Show scaffold workflow targets
+	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
 
 .PHONY: doctor
-doctor: ## Verify toolchain prerequisites
-	@for cmd in clojure clj-kondo zprint tagref dafny; do \
-		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+doctor: ## Diagnose host prerequisites and project aliases
+	@for command in clojure docker flyctl tagref; do \
+		if command -v $$command >/dev/null 2>&1; then echo "$$command: found"; else echo "$$command: missing"; fi; \
 	done
-	@echo "Clojure scaffold ready."
+	@$(CLOJURE) -Sdescribe
+	@echo "zprint, Migratus, Clofidence, Polylith, and clj-watson resolve from pinned deps.edn aliases; run make init to prefetch them."
 
 .PHONY: init
-init: install-kondo-configs install-zprint-config install-gitignore install-hooks install-migratus install-dafny CONVENTIONS.md .aider.conf.yml    ## Bootstrap dependencies and setup
+init: ## Copy .env when absent and prefetch pinned project dependencies
+	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example."; else echo ".env exists; not replacing it."; fi
+	@$(CLOJURE) -P -M:test
+	@$(CLOJURE) -P -M:zprint
+	@$(CLOJURE) -P -M:clj-kondo
+	@$(CLOJURE) -P -T:build jar
+	@$(CLOJURE) -P -M:run
+	@$(CLOJURE) -P -M:migratus
+	@$(CLOJURE) -P -M:poly
+	@$(CLOJURE) -P -M:enrich-repl
+	@$(CLOJURE) -P -X:test:coverage
+	@$(CLOJURE) -P -M:clj-watson
+	@$(CLOJURE) -P -X:deploy-clojars
+	@$(CLOJURE) -P -M:antq
+	@$(CLOJURE) -P -M:sync-deps
 
-.clj-kondo:
-	mkdir .clj-kondo
+.PHONY: check-deps
+check-deps: ## Resolve base, test, run, and Migratus classpaths; Clojure CLI has no native lockfile
+	@$(CLOJURE) -Spath >/dev/null
+	@$(CLOJURE) -A:test -Spath >/dev/null
+	@$(CLOJURE) -A:run -Spath >/dev/null
+	@$(CLOJURE) -A:migratus -Spath >/dev/null
 
-.PHONY: install-kondo-configs
-install-kondo-configs: .clj-kondo
-	clj-kondo --lint "$$(clojure -A:dev:test:cider:build -Spath)" --copy-configs --skip-lint
-
-.PHONY: check-zprint-config
-check-zprint-config:
-	@echo "Checking (HOME)/.zprint.edn..."
-	@if [ ! -f "$(HOME)/.zprint.edn" ]; then \
-		echo "Error: ~/.zprint.edn not found"; \
-		echo "Please create ~/.zprint.edn with the content: {:search-config? true}"; \
-		exit 1; \
-	fi
-	@if ! grep -q "search-config?" "$(HOME)/.zprint.edn"; then \
-		echo "Warning: ~/.zprint.edn might not contain required {:search-config? true} setting"; \
-		echo "Please ensure this setting is present for proper functionality"; \
-		exit 1; \
-	fi
-
-.zprint.edn:
-	@echo "Creating .zprint.edn..."
-	@echo '{:fn-map {"with-context" "with-meta"}, :map {:indent 0}}' > $@
-
-.dir-locals.el:
-	@echo "Creating .dir-locals.el..."
-	@echo ';;; Directory Local Variables         -*- no-byte-compile: t; -*-' > $@
-	@echo ';;; For more information see (info "(emacs) Directory Variables")' >> $@
-	@echo '((clojure-dart-ts-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojure-jank-ts-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojure-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojure-ts-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojurec-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojurec-ts-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojurescript-mode . ((apheleia-formatter . (zprint))))' >> $@
-	@echo ' (clojurescript-ts-mode . ((apheleia-formatter . (zprint)))))' >> $@
-
-.PHONY: install-zprint-config
-install-zprint-config: check-zprint-config .zprint.edn .dir-locals.el
-	@echo "zprint configuration files created successfully."
-
-.gitignore:
-	@echo "Creating a .gitignore file"
-	@echo '# Artifacts' > $@
-	@echo '**/classes' >> $@
-	@echo '**/target' >> $@
-	@echo '**/.artifacts' >> $@
-	@echo '**/.cpcache' >> $@
-	@echo '**/.DS_Store' >> $@
-	@echo '**/.gradle' >> $@
-	@echo 'logs/' >> $@
-	@echo '' >> $@
-	@echo '# 12-factor App Configuration' >> $@
-	@echo '.envrc' >> $@
-	@echo '' >> $@
-	@echo '# User-specific stuff' >> $@
-	@echo '.idea/**/workspace.xml' >> $@
-	@echo '.idea/**/tasks.xml' >> $@
-	@echo '.idea/**/usage.statistics.xml' >> $@
-	@echo '.idea/**/shelf' >> $@
-	@echo '.idea/**/statistic.xml' >> $@
-	@echo '.idea/dictionaries/**' >> $@
-	@echo '.idea/libraries/**' >> $@
-	@echo '' >> $@
-	@echo '# File-based project format' >> $@
-	@echo '*.iws' >> $@
-	@echo '*.ipr' >> $@
-	@echo '' >> $@
-	@echo '# Cursive Clojure plugin' >> $@
-	@echo '.idea/replstate.xml' >> $@
-	@echo '*.iml' >> $@
-	@echo '' >> $@
-	@echo '/example/example/**' >> $@
-	@echo 'artifacts' >> $@
-	@echo 'projects/**/pom.xml' >> $@
-	@echo '' >> $@
-	@echo '# nrepl' >> $@
-	@echo '.nrepl-port' >> $@
-	@echo '' >> $@
-	@echo '# clojure-lsp' >> $@
-	@echo '.lsp/.cache' >> $@
-	@echo '' >> $@
-	@echo '# clj-kondo' >> $@
-	@echo '.clj-kondo/.cache' >> $@
-	@echo '' >> $@
-	@echo '# Calva VS Code Extension' >> $@
-	@echo '.calva/output-window/output.calva-repl' >> $@
-	@echo '' >> $@
-	@echo '# Metaclj tempfiles' >> $@
-	@echo '.antqtool.lastupdated' >> $@
-	@echo '.enrich-classpath-repl' >> $@
-
-.PHONY: install-gitignore
-install-gitignore: .gitignore
-	@echo ".gitignore added/exists in the project"
-
-.git/hooks/pre-push:
-	@echo "Setting up Git hooks..."
-	@cat > .git/hooks/pre-push << 'EOF'
-	#!/bin/sh
-
-	# Redirect output to stderr for visibility
-	exec 1>&2
-
-	echo "Running pre-push checks..."
-
-	echo "Running make check (lints/static analysis)"
-
-	if ! make check; then
-	echo "❌ make check failed. Aborting push."
-	echo "   Fix the issues and try again."
-	exit 1
-	fi
-
-	echo "Running make format (auto-formatting)"
-	if ! make format; then
-	echo "❌ make format failed. Aborting push."
-	exit 1
-	fi
-
-	echo "Checking for uncommitted changes after formatting"
-	if ! git diff --exit-code --quiet; then
-	echo "⚠️  Code was reformatted by 'make format'!"
-	echo "   Please commit these changes before pushing."
-	exit 1
-	fi
-
-	echo "Running make test (unit tests)"
-	if ! make test; then
-	echo "❌ make test failed. Aborting push."
-	echo "   Fix the test failures and try again."
-	exit 1
-	fi
-
-	echo "✅ All checks passed. Pushing changes..."
-	exit 0
-	EOF
-	@chmod +x .git/hooks/pre-push
-	@echo "✅ Git hooks installed successfully!"
-
-.PHONY: install-hooks
-install-hooks: .git/hooks/pre-push
-
-.PHONY: install-migratus
-install-migratus:
-	@if ! grep -q "migratus" deps.edn; then \
-		echo "Adding migratus to deps.edn..."; \
-		clojure -Sdeps '{:deps {migratus/migratus {:mvn/version "1.6.5"}}}' -M -e '(println "Migratus dependency added")'; \
-	fi
-
-.PHONY: install-dafny
-install-dafny:
-	@command -v brew >/dev/null 2>&1 && brew install dafny || \
-	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
-	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
-
-CONVENTIONS.md:
-	@echo "Download the CONVENTIONS.md file from the [[https://github.com/unravel-team/metaclj][metaclj]] project"
-
-.aider.conf.yml:
-	@echo "Download the .aider.conf.yml file from the [[https://github.com/unravel-team/metaclj][metaclj]] project"
-
-# The Clojure CLI aliases that will be selected for main options for `repl`.
-# Feel free to upgrade this, or to override it with an env var named DEPS_MAIN_OPTS.
-# Expected format: "-M:alias1:alias2"
-DEPS_MAIN_OPTS ?= "-M:dev:test:logs-dev:cider-storm"
-
-.PHONY: repl
-repl:    ## Launch a REPL using the Clojure CLI
-	clojure $(DEPS_MAIN_OPTS);
-
-# The enrich-classpath version to be injected.
-# Feel free to upgrade this.
-ENRICH_CLASSPATH_VERSION="1.19.3"
-
-# Create and cache a `clojure` command. deps.edn is mandatory; the others are optional but are taken into account for cache recomputation.
-# It's important not to silence with step with @ syntax, so that Enrich progress can be seen as it resolves dependencies.
-.enrich-classpath-repl: Makefile deps.edn $(wildcard $(HOME)/.clojure/deps.edn) $(wildcard $(XDG_CONFIG_HOME)/.clojure/deps.edn)
-	cd $$(mktemp -d -t enrich-classpath.XXXXXX); clojure -Sforce -Srepro -J-XX:-OmitStackTraceInFastThrow -J-Dclojure.main.report=stderr -Sdeps '{:deps {mx.cider/tools.deps.enrich-classpath {:mvn/version $(ENRICH_CLASSPATH_VERSION)}}}' -M -m cider.enrich-classpath.clojure "clojure" "$(HERE)" "true" $(DEPS_MAIN_OPTS) | grep "^clojure" > $(HERE)/$@
-
-# Launches a repl, falling back to vanilla Clojure repl if something went wrong during classpath calculation.
-.PHONY: repl-enrich
-repl-enrich: .enrich-classpath-repl    # Launch a repl enriched with Java source code paths
-	@if grep --silent "^clojure" .enrich-classpath-repl; then \
-		echo "Executing: $$(cat .enrich-classpath-repl)" && \
-		eval $$(cat .enrich-classpath-repl); \
-	else \
-		echo "Falling back to Clojure repl... (you can avoid further falling back by removing .enrich-classpath-repl)"; \
-		clojure $(DEPS_MAIN_OPTS); \
-	fi
-
-.PHONY: check-tagref
-check-tagref:
-	tagref
+.PHONY: check-format
+check-format: ## Check Clojure formatting with pinned zprint without rewriting files
+	@$(CLOJURE) -M:zprint -c $(CLOJURE_SOURCES)
 
 .PHONY: check-cljkondo
-check-cljkondo:
-	clj-kondo --lint $(CLOJURE_SOURCES)
+check-cljkondo: ## Lint source, tests, scripts, and build metadata with pinned clj-kondo
+	@$(CLOJURE) -M:clj-kondo --config '{:config-paths ^:replace []}' --lint $(CLOJURE_SOURCES)
 
-.PHONY: check-zprint
-check-zprint:
-	zprint -c $(CLOJURE_SOURCES)
-
-.PHONY: check-dafny
-check-dafny:
-	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
-		dafny verify contracts/*.dfy; \
-	else \
-		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
-	fi
+.PHONY: check-tagref
+check-tagref: ## Validate documented cross-file references
+	@tagref check
 
 .PHONY: check
-check: check-tagref check-cljkondo check-zprint check-dafny    ## Check that the code is well linted
-	@echo "All checks passed!"
+check: check-deps check-format check-cljkondo check-tagref ## Run reproducible dependency, format, lint, and reference checks
+
+.PHONY: audit-deps
+audit-deps: ## Scan base and :migratus advisories; network and CLJ_WATSON_NVD_API_KEY required
+	@test -n "$${CLJ_WATSON_NVD_API_KEY:-}" || { echo "CLJ_WATSON_NVD_API_KEY is required for a reliable NVD scan."; exit 2; }
+	@CLJ_WATSON_ANALYZER_OSSINDEX_ENABLED=false $(CLOJURE) -M:clj-watson scan -p deps.edn -a migratus --cvss-fail-threshold 0
 
 .PHONY: format
-format:       ## Format the code to conform with our standards
-	zprint -lfw $(CLOJURE_SOURCES)
+format: ## Apply pinned zprint formatting to Clojure source and tests
+	@$(CLOJURE) -M:zprint -w $(CLOJURE_SOURCES)
 
 .PHONY: test-unit
-test-unit:  # Run unit tests
-	clojure -T:build test
+test-unit: ## Run only ^:unit tests, excluding property, integration, and LLM metadata
+	@$(CLOJURE) -M:test -i :unit -e :property -e :integration -e :llm
 
-.PHONY: test-llm
-test-llm:   # Run LLM-specific tests
-	@echo "Run LLM tests here (add appropriate test selector)"
+.PHONY: test-property
+test-property: ## Run only ^:property tests, excluding integration and LLM metadata
+	@$(CLOJURE) -M:test -i :property -e :integration -e :llm
 
 .PHONY: test-integration
-test-integration:   # Run integration tests
-	@echo "Run integration tests here (add appropriate test selector)"
+test-integration: ## Invoke ^:integration selector; empty selector succeeds by declared runner policy
+	@$(CLOJURE) -M:test -i :integration
 
-.PHONY: test-all
-test-all:
-	clojure -M:poly test :all
-
-.PHONY: test-coverage
-test-coverage:   # Run coverage reports for the code using Clofidence
-	clojure -X:dev:test:clofidence
-
-.PHONY: test-poly
-test-poly:   # Run Poly tests for the code
-	clojure -M:poly test
+.PHONY: test-llm
+test-llm: ## Invoke ^:llm selector; empty selector succeeds by declared runner policy
+	@$(CLOJURE) -M:test -i :llm
 
 .PHONY: test
-test: test-unit    ## Run unit tests
+test: test-unit test-property ## Run default unit and property test suites
 
-.PHONY: install-antq
-install-antq:
-	@if [ -f .antqtool.lastupdated ] && find .antqtool.lastupdated -mtime +15 -print | grep -q .; then \
-		echo "Updating antq tool to the latest version..."; \
-		clojure -Ttools install-latest :lib com.github.liquidz/antq :as antq; \
-		touch .antqtool.lastupdated; \
-	else \
-		echo "Skipping antq tool update..."; \
-	fi
+.PHONY: test-all
+test-all: ## Run complete Cognitect suite, including integration and LLM tests
+	@$(CLOJURE) -M:test
 
-.antqtool.lastupdated:
-	touch .antqtool.lastupdated
-
-.PHONY: upgrade-deps
-upgrade-deps: .antqtool.lastupdated install-antq    ## Upgrade all dependencies to their latest versions
-	clojure -Tantq outdated :check-clojure-tools true :upgrade true
-
-.PHONY: infra-build
-infra-build:   ## Build all the local infra (docker-compose)
-	docker compose build
-
-.PHONY: infra-up
-infra-up:   ## Bring up all the local infra (docker-compose)
-	docker compose up
-
-.PHONY: infra-down
-infra-down:       ## Bring down all the local infra (docker-compose)
-	docker compose down
-
-.PHONY: infra-logs
-infra-logs:   # Show all the logs (docker-compose)
-	docker compose logs
-
-.PHONY: migrate
-migrate: install-migratus    ## Run database migrations (using Migratus)
-	@echo "Run Migratus migrations here (requires migratus configuration)"
-
-.PHONY: migrate-create
-migrate-create: install-migratus  # Create a new database migration
-	@echo "Create Migratus migration here (requires migratus configuration)"
+.PHONY: test-coverage
+test-coverage: ## Write Clofidence coverage for unit and property tests to coverage/
+	@rm -rf coverage
+	@$(CLOJURE) -X:test:coverage
 
 .PHONY: build
-build: check    ## Build the deployment artifact
-	@echo "Run deps-new build commands here!"
-	clojure -T:build install
+build: check test ## Validate gates, then create library JAR without local Maven installation
+	@$(CLOJURE) -T:build jar
 
-.PHONY: localinstall
-localinstall: build   # Install the artifact locally
-	clojure -T:build install
+.PHONY: ci
+ci: check test audit-deps ## Run offline checks, default tests, and network vulnerability audit
 
-.PHONY: deploy
-deploy: build    ## Deploy the current code to production
-	@echo "Run fly.io deployment commands here!"
-
-.PHONY: deploy-lib
-deploy-lib: build  # Deploy to Clojars. needs `CLOJARS_USERNAME` and `CLOJARS_PASSWORD` env vars
-	clojure -T:build deploy
-
-.PHONY: clean-projects
-clean-projects:
-	rm -rf projects/*/target/public
+.PHONY: dev
+dev: ## Run JVM HTTP server on http://0.0.0.0:8080
+	@$(CLOJURE) -M:run
 
 .PHONY: clean
-clean: clean-projects    ## Delete any existing artifacts
-	rm -rf target/
+clean: ## Remove local JAR, class, coverage, and Migratus artifacts
+	@rm -rf target coverage
+
+.PHONY: clean-cache
+clean-cache: ## Remove project-local CLI/linter caches; preserve global Maven cache
+	@for cache in .cpcache .clj-kondo/.cache; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	rm -rf -- .cpcache .clj-kondo/.cache
+
+.PHONY: infra-build
+infra-build: ## Build local Docker Compose services
+	@docker compose build
+
+.PHONY: infra-up
+infra-up: ## Start local PostgreSQL with named data volume
+	@docker compose up -d
+
+.PHONY: infra-down
+infra-down: ## Stop local Docker Compose services
+	@docker compose down
+
+.PHONY: infra-logs
+infra-logs: ## Follow local Docker Compose service logs
+	@docker compose logs -f
+
+.PHONY: infra-down-clean
+infra-down-clean: ## Prompt, then remove local services and volumes only for exact yes
+	@echo "Warning: removing volumes permanently deletes local PostgreSQL data."
+	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
+	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
+
+.PHONY: migrate
+migrate: ## Apply Migratus migrations using exported or plain .env DATABASE_URL
+	@$(CLOJURE) -M:migratus -m migratus-run migrate
+
+# Reuse the runner's existing environment parser without duplicating credential handling.
+.PHONY: migrate-rollback
+migrate-rollback: ## Roll back the latest Migratus migration
+	@$(CLOJURE) -M:migratus -e "(require 'migratus-run 'migratus.core) (migratus.core/rollback ((ns-resolve 'migratus-run 'database-config)))"
+
+.PHONY: migrate-status
+migrate-status: ## Print completed and pending Migratus migrations
+	@$(CLOJURE) -M:migratus -e "(require 'migratus-run 'migratus.core) (let [config ((ns-resolve 'migratus-run 'database-config))] (prn {:completed (migratus.core/completed-list config) :pending (migratus.core/pending-list config)}))"
+
+.PHONY: migrate-create
+migrate-create: ## Create Migratus migration files; use NAME='describe change'
+	@test -n "$(NAME)" || { echo "NAME is required, e.g. make migrate-create NAME='add widgets'"; exit 2; }
+	@$(CLOJURE) -M:migratus -m migratus-run create "$(NAME)"
+
+.PHONY: deploy
+deploy: ## Deploy Fly app only after fly.toml app identity is customized
+	@app_name=$$(awk -F '"' '/^app = / { print $$2; exit }' fly.toml); \
+	if [ -z "$$app_name" ] || [ "$$app_name" = "$(PLACEHOLDER_APP)" ]; then echo "Set a unique app name in fly.toml before deploy."; exit 2; fi
+	@$(MAKE) --no-print-directory build
+	@flyctl deploy --config fly.toml
+
+.PHONY: deploy-clojars
+deploy-clojars: ## Publish current JAR only from exact clean standalone annotated release tag
+	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Publishing requires standalone Git repository."; exit 2; }; \
+	[ "$$root" = "$$(pwd -P)" ] || { echo "Publishing must run from standalone project root."; exit 2; }; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Publishing requires clean committed state."; exit 2; fi; \
+	lib=$$($(CLOJURE) -T:build library-name); \
+	if [ -z "$$lib" ] || [ "$${lib##*/}" = "$(PLACEHOLDER_LIB)" ]; then echo "Set a unique build.clj library identity before publishing."; exit 2; fi; \
+	if [ -z "$${CLOJARS_USERNAME:-}" ] || [ -z "$${CLOJARS_PASSWORD:-}" ]; then echo "CLOJARS_USERNAME and CLOJARS_PASSWORD are required."; exit 2; fi; \
+	version=$$($(CLOJURE) -T:build version); tag="v$$version"; \
+	git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }
+	@$(MAKE) --no-print-directory build
+	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
+	@artifact=$$($(CLOJURE) -T:build artifact-path); pom_file=$$($(CLOJURE) -T:build pom-path); \
+	test -f "$$artifact" && test -f "$$pom_file" || { echo "Expected current-version JAR and POM are missing."; exit 2; }; \
+	$(CLOJURE) -X:deploy-clojars :installer :remote :artifact "\"$$artifact\"" :pom-file "\"$$pom_file\"" :sign-releases? false
+
+.PHONY: version
+version: ## Print plain semantic version
+	@$(CLOJURE) -T:build version
+
+.PHONY: major
+major: ## Bump major version metadata only
+	@$(CLOJURE) -T:build major
+
+.PHONY: minor
+minor: ## Bump minor version metadata only
+	@$(CLOJURE) -T:build minor
+
+.PHONY: patch
+patch: ## Bump patch version metadata only
+	@$(CLOJURE) -T:build patch
+
+.PHONY: release
+release: ## Validate then locally annotate clean standalone HEAD with current version
+	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Release requires standalone Git repository."; exit 2; }; \
+	[ "$$root" = "$$(pwd -P)" ] || { echo "Release must run from standalone project root."; exit 2; }; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Release requires clean committed state."; exit 2; fi
+	@$(MAKE) --no-print-directory build
+	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
+	@version=$$($(CLOJURE) -T:build version); tag="v$$version"; \
+	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
+	git tag --annotate "$$tag" --message "Release $$tag"
+
+.PHONY: upgrade-deps
+upgrade-deps: ## Update deps.edn constraints and synchronize canonical Org source
+	@$(CLOJURE) -M:antq --upgrade
+	@$(CLOJURE) -M:sync-deps
+
+.PHONY: repl
+repl: ## Start a reproducible Clojure REPL with project source paths
+	@$(CLOJURE) -M
+
+.PHONY: repl-enrich
+repl-enrich: ## Generate then start REPL with pinned Java-source classpath enrichment
+	@enriched_command="$$($(CLOJURE) -M:enrich-repl | awk '/^clojure / { command=$$0 } END { print command }')"; \
+	[[ "$$enriched_command" == clojure\ * ]] || { echo "Enrich did not return a Clojure command."; exit 2; }; \
+	echo "Starting enriched REPL."; \
+	eval "$$enriched_command"
+
+.PHONY: poly
+poly: ## Run Polylith only in a workspace containing workspace.edn
+	@test -f workspace.edn || { echo "This base scaffold is not a Polylith workspace; add workspace.edn and components before running poly."; exit 2; }
+	@$(CLOJURE) -M:poly info

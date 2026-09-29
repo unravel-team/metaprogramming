@@ -1,10 +1,59 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}}
  :aliases
- {:test {:extra-paths ["test"]
-         :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-         :main-opts ["-m" "cognitect.test-runner"]}
-  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+ {:test {:extra-paths ["test" "app"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                      org.clojure/test.check {:mvn/version "1.1.1"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}
+
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.14"}}
           :ns-default build}
+
   :zprint {:extra-deps {zprint/zprint {:mvn/version "1.3.0"}}
-           :main-opts ["-m" "zprint.main"]}}}
+           :main-opts ["-m" "zprint.main"]}
+
+  :clj-kondo {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.08.04"}}
+              :main-opts ["-m" "clj-kondo.main"]}
+
+  :run {:extra-paths ["app"]
+        :main-opts ["-m" "metaprogramming.server"]}
+
+  :migratus {:extra-paths ["scripts"]
+             :extra-deps {migratus/migratus {:mvn/version "1.6.7"}
+                          org.postgresql/postgresql {:mvn/version "42.7.8"}}}
+
+  :poly {:extra-deps {polylith/clj-poly {:mvn/version "0.3.32"}}
+         :main-opts ["-m" "polylith.clj.core.core"]}
+
+  :coverage {:classpath-overrides {org.clojure/clojure nil}
+             :extra-paths ["scripts"]
+             :extra-deps {com.github.flow-storm/clojure {:mvn/version "1.12.5"}
+                          com.github.flow-storm/clofidence {:mvn/version "0.5.0"}}
+             :exec-fn coverage-runner/run
+             :exec-args {:report-name "metaprogramming"
+                         :output-folder "coverage"
+                         :test-fn cognitect.test-runner.api/test
+                         :test-fn-args [{:dirs ["test"]
+                                         :includes [:unit :property]
+                                         :excludes [:integration :llm]}]}
+             :jvm-opts ["-Dclojure.storm.instrumentAutoPrefixes=false"
+                        "-Dclojure.storm.instrumentOnlyPrefixes=metaprogramming"
+                        "-Dclojure.storm.instrumentSkipRegex=.*-test.*"]}
+
+  :enrich-repl {:extra-deps {mx.cider/tools.deps.enrich-classpath {:mvn/version "1.19.3"}}
+                :main-opts ["-m" "cider.enrich-classpath.clojure" "clojure" "." "true" "-M"]}
+
+  :clj-watson {:replace-deps {io.github.clj-holmes/clj-watson
+                              {:git/tag "v6.1.0" :git/sha "be98e4d"}}
+                :main-opts ["-m" "clj-watson.cli"]}
+
+  :deploy-clojars {:extra-deps {slipset/deps-deploy {:mvn/version "0.2.5"}}
+                   :exec-fn deps-deploy.deps-deploy/deploy}
+
+  :antq {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1276"}}
+         :main-opts ["-m" "antq.core"]}
+
+  :sync-deps {:extra-paths ["scripts"]
+              :main-opts ["-m" "sync-deps-org"]}}}

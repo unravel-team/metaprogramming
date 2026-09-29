@@ -1,6 +1,11 @@
 .aider*
 .env
+.tools/
+.cache/
 /bin/
 /tmp/
+/coverage/
 /vendor/
 *.exe
+
+.hegel/

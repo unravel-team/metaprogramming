@@ -1,0 +1,133 @@
+# TypeScript Scaffold
+
+Copied standalone Next.js App Router application and TypeScript library scaffold.
+
+## Setup
+
+Install Node.js 22+, Corepack, Docker Compose, `tagref`, and Fly CLI (Fly is
+needed only for deployment). This project pins pnpm in `packageManager`; use
+`corepack pnpm` rather than installing pnpm globally.
+
+```sh
+make init
+make check test
+make dev
+```
+
+`make init` copies `.env.example` only when `.env` is absent, then installs exact
+locked dependencies. Normal workflow targets use local tools through
+`corepack pnpm exec` and never install or update dependencies. `make check-deps`
+uses frozen lockfile-only validation, so it neither changes the lockfile nor
+installs packages. `make doctor` diagnoses host and project-local requirements.
+`make upgrade-deps` is deliberate maintenance: review both `package.json` and
+`pnpm-lock.yaml` after it runs.
+
+## Application and library
+
+`src/app/page.tsx` and `src/app/layout.tsx` provide the default Next.js App
+Router application. `GET /health` returns `{ "status": "ok" }`
+[ref:health-route]. `src/index.ts` remains a dependency-free library API. Root
+`package.json` is private and keeps only application dependencies and scripts.
+After its gates pass, `make build` runs `next build`, emits library JavaScript
+and declarations, then stages `dist/package.json` and `dist/README.md`. That
+staged manifest inherits package name, version, and description, but declares
+only library-relative `index.js`/`index.d.ts` exports—no Next/React dependencies
+or application scripts. Verify exactly what consumers receive with:
+
+```sh
+corepack pnpm --dir dist pack --pack-destination /tmp/library-pack
+```
+
+The staged README documents package installation and `example` import usage.
+
+`make dev` serves Next locally. The Fly Docker image runs Next standalone output
+on `0.0.0.0:8080`; Fly health checks use `/health`.
+
+## Tests and checks
+
+- `make test` runs unit and Hegel property tests only.
+- `make test-unit` excludes `*.property.test.ts`, `*.integration.test.ts`, and
+  `*.llm.test.ts`; `make test-property` selects property files and excludes
+  external variants.
+- `make test-integration` and `make test-llm` invoke real Vitest configs. Their
+  `passWithNoTests` policy permits intentionally empty optional suites.
+- `make test-all` runs every `*.test.ts`, including integration and LLM files.
+- `make test-coverage` runs default suites with V8 terminal, LCOV, and HTML
+  reports under `coverage/`. It includes unimported library and route source, so
+  unexecuted application paths show as uncovered. Async Next server components
+  are not rendered by these Node-environment Vitest tests; V8 remapping excludes
+  their unrendered `.tsx` files. Browser/server integration coverage needs a
+  dedicated integration runner.
+
+`make check` performs frozen dependency validation, Biome formatting/linting,
+TypeScript checks, Knip, jscpd, and tag reference validation. It is offline after
+`make init`. `make audit-deps` queries npm advisories, requires network access,
+and fails when findings meet npm's low severity threshold. `make ci` includes
+check, default tests, and audit; run init first and supply network access.
+
+### Hegel pilot
+
+`@hegeldev/hegel` is pinned to 0.4.7 as a development dependency. Vitest remains
+the runner; `hegel.test` executes immediately, so call it **inside** the Vitest
+callback as shown in `tests/example.property.test.ts`. The sample uses bounded
+integers to keep arithmetic within the intended domain.
+
+`make init` installs the platform-specific native engine under `node_modules`.
+`pnpm-workspace.yaml` permits only Koffi's native install script; Docker dependency
+setup copies this policy too. Do not omit optional dependencies. Make clears any
+host `HEGEL_LIBHEGEL_PATH` override so the locked platform package is used. No
+Python server, test-time downloads, or application runtime dependency is added.
+
+Upstream native packages cover Linux x64/arm64, macOS arm64, and Windows x64/arm64;
+Intel macOS has no prebuilt engine. The scaffold Makefile still requires Bash.
+This pilot was exercised on macOS arm64, not Linux/Windows or Docker. Run the
+same acceptance checks before relying on another platform or container libc.
+
+For repeatable investigation, pass `{ seed: 2026, database: hegel.Database.disabled }`
+as the second argument to `hegel.test`. Keep the library/engine version, property,
+and settings unchanged when replaying. Use the minimized concrete input in a named
+regression test for durable reproduction across upgrades. Default runs explore
+100 cases; don't permanently fix a seed merely to make a failure disappear.
+
+Local example databases under `.hegel/` are ignored by Git/Docker and deliberately
+preserved by `clean`/`clean-cache`. Hegel disables persistence and uses deterministic
+generation by default in CI. The native library remains an installed dependency,
+not a disposable cache. From the metaprogramming repository root, after setup:
+
+```sh
+HEGEL_PILOT=1 python3 -m unittest discover -s tests -p test_hegel_pilot.py -v
+```
+
+That opt-in check verifies actual execution, a deliberate failure shrinking to 50,
+seeded reproduction in a fresh process, and a corrected property passing. It also
+checks Go; copied standalone projects can use their ordinary `make test-property`.
+Hegel is beta: review dependency upgrades rather than assuming API stability.
+
+## Database and local infrastructure
+
+`make infra-up` starts PostgreSQL with named `postgres_data` volume. Database
+URL defaults come from `.env`; export `DATABASE_URL` for another database.
+`make migrate` runs dbmate migrations in `db/migrations`; create one with:
+
+```sh
+make migrate-create MESSAGE='add widgets'
+```
+
+`make infra-down-clean` always prints data-loss warning and reads confirmation.
+Only exact `yes` removes volumes; EOF, `no`, and `YES` preserve data. No bypass
+variable exists.
+
+## Build, release, and publish safety
+
+Customize package name, description, and Fly app name before releasing. `make
+deploy` rejects placeholder Fly app identity. `make version` prints plain semantic
+version; `make major`, `make minor`, and `make patch` only update `package.json`
+with normal semver reset rules. They never create commits, tags, or branches.
+
+`make release` requires clean standalone Git repository root before and after
+build, then creates local annotated `vVERSION` tag. It never pushes. `make
+deploy-npm` requires clean standalone exact annotated release state, custom
+package name, and `NPM_TOKEN`; it creates a restrictive temporary npm config
+that supplies that token to the npm registry, builds current artifacts, and
+publishes only staged `dist/`. Deploy, release, publish, and migrations never
+run automatically.

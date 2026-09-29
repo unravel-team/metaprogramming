@@ -1,272 +1,216 @@
-HOME := $(shell echo $$HOME)
-HERE := $(shell echo $$PWD)
-
-BIOME_SCOPE ?= src/
-
-# Set bash instead of sh for the @if [[ conditions,
-# and use the usual safety flags:
-SHELL = /bin/bash -Eeu
-
+SHELL := /bin/bash
+.SHELLFLAGS := -Eeu -o pipefail -c
 .DEFAULT_GOAL := help
 
+# Keep the dependency store local; installed packages are not cache-cleanup targets.
+PNPM := corepack pnpm --store-dir "$(CURDIR)/.cache/pnpm/store"
+# Resolve the locked platform package, not an unrelated host engine override.
+export HEGEL_LIBHEGEL_PATH
+override HEGEL_LIBHEGEL_PATH :=
+PLACEHOLDER_APP := replace-with-your-fly-app-name
+PLACEHOLDER_PACKAGE := typescript-scaffold
+VERSION_SCRIPT := scripts/release.mjs
+
 .PHONY: help
-help:    ## A brief listing of all available commands
-	@awk '/^[a-zA-Z0-9_-]+:.*##/ { \
-		printf "%-25s # %s\n", \
-		substr($$1, 1, length($$1)-1), \
-		substr($$0, index($$0,"##")+3) \
-	}' $(MAKEFILE_LIST)
+help: ## Show scaffold workflow targets
+	@awk '/^[a-zA-Z0-9_-]+:.*##/ { printf "%-20s %s\n", substr($$1, 1, length($$1)-1), substr($$0, index($$0, "##") + 3) }' $(MAKEFILE_LIST)
 
 .PHONY: doctor
-doctor: ## Verify toolchain prerequisites
-	@for cmd in bun node tagref dbmate dafny; do \
-		command -v $$cmd >/dev/null 2>&1 || { echo "$$cmd is required"; exit 1; }; \
+doctor: ## Diagnose host prerequisites and project-local tools
+	@for command in node corepack docker flyctl tagref; do \
+		if command -v $$command >/dev/null 2>&1; then echo "$$command: found"; else echo "$$command: missing"; fi; \
 	done
-	@echo "TypeScript scaffold ready."
-
-.PHONY: install
-install:
-	bun install
+	@$(PNPM) --version
+	@for tool in next vitest tsc dbmate; do \
+		if [ -x "node_modules/.bin/$$tool" ]; then echo "$$tool: installed"; else echo "$$tool: run make init"; fi; \
+	done
 
 .PHONY: init
-init: install install-sveltekit install-vitest install-biome install-svelte-check install-dbmate install-dafny install-hooks .gitignore    ## Bootstrap dependencies and setup
+init: ## Copy .env when absent and install locked pnpm dependencies
+	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example."; else echo ".env exists; not replacing it."; fi
+	@$(PNPM) install --frozen-lockfile
 
-.PHONY: ci
-ci:
-	bun ci
+.PHONY: check-deps
+check-deps: ## Verify package manifest matches frozen lock without installing
+	@$(PNPM) install --frozen-lockfile --lockfile-only --ignore-scripts
 
-package.json:
-	@if [ ! -f package.json ]; then \
-		echo "Creating package.json..."; \
-		bun init -y; \
-		echo "Please configure your package.json manually"; \
-	fi
+.PHONY: check-format
+check-format: ## Check Biome formatting without rewriting files
+	@$(PNPM) exec biome format src tests scripts *.config.ts package.json tsconfig*.json next-env.d.ts
 
-.PHONY: install-sveltekit
-install-sveltekit: package.json
-	@echo "Installing SvelteKit dependencies (requires an existing SvelteKit project scaffold)..."
-	bun install --save-dev @sveltejs/kit @sveltejs/adapter-auto @sveltejs/vite-plugin-svelte svelte vite
-	@node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts.dev ? 0 : 1)" >/dev/null 2>&1 || bun pkg set scripts.dev="vite dev"
-	@node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts.build ? 0 : 1)" >/dev/null 2>&1 || bun pkg set scripts.build="vite build"
-	@node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts.preview ? 0 : 1)" >/dev/null 2>&1 || bun pkg set scripts.preview="vite preview"
+.PHONY: check-lint
+check-lint: ## Lint source and test files with Biome
+	@$(PNPM) exec biome lint src tests scripts *.config.ts
 
-.PHONY: install-biome
-install-biome: package.json
-	bun install --save-dev @biomejs/biome
-	@if [ ! -f biome.json ]; then \
-		bunx @biomejs/biome init; \
-	fi
-
-.PHONY: install-vitest
-install-vitest: package.json
-	bun install --save-dev vitest
-	@if ! bun pkg get scripts.test >/dev/null 2>&1; then bun pkg set scripts.test="vitest run"; fi
-	@if ! bun pkg get scripts.test:watch >/dev/null 2>&1; then bun pkg set scripts.test:watch="vitest"; fi
-	@if ! bun pkg get scripts.test:coverage >/dev/null 2>&1; then bun pkg set scripts.test:coverage="vitest run --coverage"; fi
-
-.PHONY: install-svelte-check
-install-svelte-check: package.json
-	bun install --save-dev svelte-check typescript
-
-.PHONY: install-dbmate
-install-dbmate:
-	@if command -v brew >/dev/null 2>&1; then \
-		brew install dbmate; \
-	elif command -v curl >/dev/null 2>&1; then \
-		curl -fsSL https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64.tar.gz | tar -xz && sudo mv dbmate /usr/local/bin/; \
-	else \
-		echo "Please install dbmate manually from https://github.com/amacneil/dbmate"; \
-		exit 1; \
-	fi
-
-.PHONY: install-dafny
-install-dafny:
-	@command -v brew >/dev/null 2>&1 && brew install dafny || \
-	[ "$$(uname)" = "Linux" ] && snap install dafny --classic || \
-	{ echo "Please install Dafny from https://github.com/dafny-lang/dafny/releases"; exit 1; }
-
-.git/hooks/pre-push:
-	@echo "Setting up Git hooks..."
-	@cat > .git/hooks/pre-push << 'EOF'
-	#!/bin/sh
-
-	# Redirect output to stderr for visibility
-	exec 1>&2
-
-	echo "Running pre-push checks..."
-
-	echo "Running make check (lints/static analysis)"
-
-	if ! make check; then
-	echo "❌ make check failed. Aborting push."
-	echo "   Fix the issues and try again."
-	exit 1
-	fi
-
-	echo "Running make format (auto-formatting)"
-	if ! make format; then
-	echo "❌ make format failed. Aborting push."
-	exit 1
-	fi
-
-	echo "Checking for uncommitted changes after formatting"
-	if ! git diff --exit-code --quiet; then
-	echo "⚠️  Code was reformatted by 'make format'!"
-	echo "   Please commit these changes before pushing."
-	exit 1
-	fi
-
-	echo "Running make test (unit tests)"
-	if ! make test; then
-	echo "❌ make test failed. Aborting push."
-	echo "   Fix the test failures and try again."
-	exit 1
-	fi
-
-	echo "✅ All checks passed. Pushing changes..."
-	exit 0
-	EOF
-	@chmod +x .git/hooks/pre-push
-	@echo "✅ Git hooks installed successfully!"
-
-.PHONY: install-hooks
-install-hooks: .git/hooks/pre-push
-
-.gitignore:
-	@echo "Download the .gitignore file from the [[https://github.com/unravel-team/metats][metats]] project"
-
-.PHONY: upgrade-deps
-upgrade-deps:    ## Upgrade all dependencies to their latest versions
-	bun update
-	bun audit fix
-
-.PHONY: check-tagref
-check-tagref:
-	@if ! command -v tagref >/dev/null 2>&1; then \
-		echo "tagref executable not found. Please install it from https://github.com/stepchowfun/tagref/releases/"; \
-		exit 1; \
-	fi
-	tagref
-
-.PHONY: check-biome
-check-biome:
-	bunx @biomejs/biome check $(BIOME_SCOPE)
-
-.PHONY: check-typescript
-check-typescript:
-	@if [ -f svelte.config.js ] || [ -f svelte.config.ts ]; then \
-		bunx svelte-check --tsconfig ./tsconfig.json; \
-	else \
-		bunx tsc --noEmit; \
-	fi
-
-.PHONY: check-dafny
-check-dafny:
-	@if [ -d "contracts" ] && ls contracts/*.dfy >/dev/null 2>&1; then \
-		dafny verify contracts/*.dfy; \
-	else \
-		echo "No Dafny contracts found in contracts/*.dfy, skipping..."; \
-	fi
+.PHONY: check-types
+check-types: ## Type-check Next application, library, and tests without emitting
+	@$(PNPM) exec tsc --noEmit -p tsconfig.json
 
 .PHONY: check-knip
-check-knip:
-	bunx knip
+check-knip: ## Find unused files, exports, and dependencies
+	@$(PNPM) exec knip
 
 .PHONY: check-jscpd
-check-jscpd:
-	bunx jscpd src tests
+check-jscpd: ## Detect duplicate code in source and tests
+	@$(PNPM) exec jscpd src tests --config .jscpd.json
+
+.PHONY: check-tagref
+check-tagref: ## Validate documented source references
+	@tagref
 
 .PHONY: check
-check: check-biome check-typescript check-tagref check-knip check-jscpd check-dafny    ## Check that the code is well linted, well typed, well documented
-	@echo "All checks passed!"
+check: check-deps check-format check-lint check-types check-knip check-jscpd check-tagref ## Run offline quality checks
+
+.PHONY: audit-deps
+audit-deps: ## Query npm advisories; requires network and fails on findings
+	@$(PNPM) audit --audit-level=low
 
 .PHONY: format
-format:    ## Format code with Biome
-	@if [ -d "$(BIOME_SCOPE)" ]; then \
-		bunx @biomejs/biome check --write $(BIOME_SCOPE); \
-	else \
-		echo "No $(BIOME_SCOPE) directory found; skipping Biome format"; \
-	fi
+format: ## Apply Biome formatting and safe lint fixes
+	@$(PNPM) exec biome check --write src tests scripts *.config.ts package.json tsconfig*.json next-env.d.ts
 
 .PHONY: test-unit
-test-unit:
-	bun test --config vitest.config.unit.ts
+test-unit: ## Run unit tests, excluding property, integration, and LLM files
+	@$(PNPM) exec vitest run --config vitest.unit.config.ts
 
-.PHONY: test-llm
-test-llm:
-	bun test --config vitest.config.llm.ts
+.PHONY: test-property
+test-property: ## Run Hegel property tests, excluding external selectors
+	@$(PNPM) exec vitest run --config vitest.property.config.ts
 
 .PHONY: test-integration
-test-integration:
-	bun test --config vitest.config.integration.ts
+test-integration: ## Run integration tests; empty selector succeeds by declared policy
+	@$(PNPM) exec vitest run --config vitest.integration.config.ts
+
+.PHONY: test-llm
+test-llm: ## Run LLM tests; empty selector succeeds by declared policy
+	@$(PNPM) exec vitest run --config vitest.llm.config.ts
 
 .PHONY: test
-test: test-unit    ## Run unit tests
+test: test-unit test-property ## Run default unit and property suites
 
-.PHONY: test-watch
-test-watch:
-	bun run test:watch
+.PHONY: test-all
+test-all: ## Run complete Vitest suite, including integration and LLM tests
+	@$(PNPM) exec vitest run --config vitest.config.ts
 
 .PHONY: test-coverage
-test-coverage:
-	bun run test:coverage
-
-.PHONY: dev
-dev:    ## Run the SvelteKit development server
-	bun run dev
+test-coverage: ## Write V8 terminal, LCOV, and HTML coverage for default suites
+	@$(PNPM) exec vitest run --coverage --config vitest.default.config.ts
 
 .PHONY: build
-build: check    ## Build the SvelteKit application for production
-	bun run build
+build: check test ## Validate gates, then build Next app and separate library artifacts
+	@$(PNPM) run build
 
-.PHONY: preview
-preview:
-	bun run preview
+.PHONY: ci
+ci: check test audit-deps ## Run offline checks, default tests, and network audit
 
-.PHONY: infra-build
-infra-build:   ## Build all the local infra (docker-compose)
-	docker compose build
-
-.PHONY: infra-up
-infra-up:     ## Bring up all the local infra (docker-compose)
-	docker compose up
-
-.PHONY: infra-down
-infra-down:       ## Bring down all the local infra (docker-compose)
-	docker compose down
-
-.PHONY: infra-logs
-infra-logs:
-	docker compose logs
-
-.PHONY: migrate
-migrate: install-dbmate    ## Run database migrations (using dbmate)
-	dbmate up
-
-.PHONY: migrate-create
-migrate-create:  install-dbmate
-	@read -p "Enter migration name: " name; \
-	dbmate new $$name
-
-.PHONY: migrate-rollback
-migrate-rollback: Rollback the last database migration
-	dbmate rollback
-
-.PHONY: deploy
-deploy: build    ## Deploy the current code to production
-	@echo "Run deployment commands here (Vercel, Netlify, etc.)!"
-
-.PHONY: clean-cache
-clean-cache:
-	bun cache clean --force
-	rm -rf .svelte-kit
-	rm -rf node_modules/.vite
+.PHONY: dev
+dev: ## Run Next development server on http://127.0.0.1:3000
+	@$(PNPM) run dev
 
 .PHONY: clean
-clean:     ## Delete any existing artifacts
-	rm -rf node_modules/
-	rm -rf .svelte-kit/
-	rm -rf build/
-	rm -rf dist/
-	rm -rf coverage/
-	rm -f *.tsbuildinfo
+clean: ## Remove local build, coverage, and library artifacts
+	@rm -rf .next dist coverage
+
+.PHONY: clean-cache
+clean-cache: ## Remove only project-owned pnpm, Next, and tool caches
+	@for cache in .cache/pnpm/store .next/cache node_modules/.cache coverage/.tmp; do \
+		path="$$cache"; while :; do \
+			[ ! -L "$$path" ] || { echo "Refusing symlink cache path: $$path"; exit 2; }; \
+			case "$$path" in */*) path="$${path%/*}" ;; *) break ;; esac; \
+		done; \
+	done; \
+	rm -rf -- .cache/pnpm/store .next/cache node_modules/.cache coverage/.tmp
+
+.PHONY: infra-build
+infra-build: ## Build local Docker Compose services
+	@docker compose build
+
+.PHONY: infra-up
+infra-up: ## Start local PostgreSQL with named data volume
+	@docker compose up -d
+
+.PHONY: infra-down
+infra-down: ## Stop local Docker Compose services
+	@docker compose down
+
+.PHONY: infra-logs
+infra-logs: ## Follow local Docker Compose service logs
+	@docker compose logs -f
+
+.PHONY: infra-down-clean
+infra-down-clean: ## Prompt, then remove local services and volumes only for yes
+	@echo "Warning: removing volumes permanently deletes local PostgreSQL data."
+	@read -r -p "Type yes to remove volumes: " confirm || confirm=""; \
+	if [ "$$confirm" = "yes" ]; then docker compose down --volumes; else echo "Aborted; volumes preserved."; fi
+
+.PHONY: migrate
+migrate: ## Apply dbmate migrations using DATABASE_URL
+	@$(PNPM) exec dbmate --migrations-dir db/migrations up
+
+.PHONY: migrate-rollback
+migrate-rollback: ## Roll back the latest dbmate migration using DATABASE_URL
+	@$(PNPM) exec dbmate --migrations-dir db/migrations down
+
+.PHONY: migrate-status
+migrate-status: ## Show applied and pending dbmate migrations
+	@$(PNPM) exec dbmate --migrations-dir db/migrations status
+
+.PHONY: migrate-create
+migrate-create: ## Create migration; use MESSAGE='describe change'
+	@test -n "$(MESSAGE)" || { echo "MESSAGE is required, e.g. make migrate-create MESSAGE='add widgets'"; exit 2; }
+	@$(PNPM) exec dbmate --migrations-dir db/migrations new "$(MESSAGE)"
+
+.PHONY: deploy
+deploy: ## Deploy to Fly only after app identity is customized
+	@app_name=$$(awk -F '"' '/^app = / { print $$2; exit }' fly.toml); \
+	if [ -z "$$app_name" ] || [ "$$app_name" = "$(PLACEHOLDER_APP)" ]; then echo "Set a unique app name in fly.toml before deploy."; exit 2; fi
+	@$(MAKE) --no-print-directory build
+	@flyctl deploy --config fly.toml
+
+.PHONY: deploy-npm
+deploy-npm: ## Publish only clean standalone current-version release artifacts
+	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Publishing requires standalone Git repository."; exit 2; }; \
+	[ "$$root" = "$$(pwd -P)" ] || { echo "Publishing must run from standalone project root."; exit 2; }; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Publishing requires clean committed state."; exit 2; fi; \
+	package_name=$$(node -p 'require("./package.json").name'); \
+	if [ "$$package_name" = "$(PLACEHOLDER_PACKAGE)" ]; then echo "Set a unique package name before publishing."; exit 2; fi; \
+	if [ -z "$${NPM_TOKEN:-}" ]; then echo "NPM_TOKEN is required."; exit 2; fi; \
+	version=$$(node $(VERSION_SCRIPT) version); tag="v$$version"; \
+	git rev-parse --verify --quiet "$$tag^{tag}" >/dev/null && [ "$$(git rev-parse "$$tag^{commit}")" = "$$(git rev-parse HEAD)" ] || { echo "Annotated $$tag must identify current HEAD."; exit 2; }
+	@$(MAKE) --no-print-directory build
+	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
+	@npmrc=$$(mktemp); trap 'rm -f "$$npmrc"' EXIT; chmod 600 "$$npmrc"; \
+	printf '//registry.npmjs.org/:_authToken=%s\n' "$$NPM_TOKEN" > "$$npmrc"; \
+	NPM_CONFIG_USERCONFIG="$$npmrc" $(PNPM) --dir dist publish --access public --no-git-checks
+
+.PHONY: version
+version: ## Print semantic package version
+	@node $(VERSION_SCRIPT) version
+
+.PHONY: major
+major: ## Bump major version metadata only
+	@node $(VERSION_SCRIPT) major
+
+.PHONY: minor
+minor: ## Bump minor version metadata only
+	@node $(VERSION_SCRIPT) minor
+
+.PHONY: patch
+patch: ## Bump patch version metadata only
+	@node $(VERSION_SCRIPT) patch
+
+.PHONY: release
+release: ## Validate then tag clean standalone HEAD with local annotated version
+	@root=$$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Release requires standalone Git repository."; exit 2; }; \
+	[ "$$root" = "$$(pwd -P)" ] || { echo "Release must run from standalone project root."; exit 2; }; \
+	if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Release requires clean committed state."; exit 2; fi
+	@$(MAKE) --no-print-directory build
+	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then echo "Build changed release state."; exit 2; fi
+	@version=$$(node $(VERSION_SCRIPT) version); tag="v$$version"; \
+	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then echo "$$tag already exists."; exit 2; fi; \
+	git tag --annotate "$$tag" --message "Release $$tag"
+
+.PHONY: upgrade-deps
+upgrade-deps: ## Deliberately update package constraints and pnpm lockfile
+	@$(PNPM) update --latest
+	@$(PNPM) install

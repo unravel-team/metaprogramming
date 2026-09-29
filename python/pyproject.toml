@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,16 +8,29 @@ version = "0.1.0"
 description = "Repeatable Python starter scaffold"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "alembic>=1.15,<2",
+  "fastapi>=0.115,<1",
+  "psycopg[binary]>=3.2,<4",
+  "sqlalchemy>=2.0,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
 
 [dependency-groups]
 dev = [
-  "bandit",
-  "basedpyright",
-  "pytest",
-  "pytest-asyncio",
-  "ruff",
-  "ty"
+  "bandit>=1.8,<2",
+  "basedpyright>=1.29,<2",
+  "coverage>=7,<8",
+  "httpx>=0.28,<1",
+  "hypothesis>=6.0,<7",
+  "pip-audit>=2.8,<3",
+  "pytest>=8.3,<10",
+  "pytest-asyncio>=0.25,<2",
+  "pytest-cov>=6.0,<8",
+  "radon>=6,<7",
+  "ruff>=0.9,<1",
+  "yamllint>=1,<2",
+  "ty>=0.0.1a21,<1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -28,8 +41,11 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 markers = [
   "unit: fast unit tests",
+  "property: generative tests using Hypothesis",
   "integration: tests that require external infrastructure",
-  "llm: tests that exercise LLM-facing behavior"
+  "llm: tests that exercise LLM-facing behavior",
+  "e2e: End-to-end tests (requires full stack)",
+  "slow: Slow-running tests",
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -39,14 +55,18 @@ line-length = 88
 src = ["src"]
 
 [tool.ruff.lint]
-select = ["E", "F", "UP", "B", "SIM", "I"]
+select = ["E", "F", "UP", "B", "SIM", "I", "N", "PLC", "PLE", "PLR"]
 ignore = ["E501"]
 
 [tool.basedpyright]
+include = ["src/"]
 pythonVersion = "3.12"
-reportAny = false
-reportExplicitAny = false
-reportUnknownMemberType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
-reportUnknownLambdaType = false
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportImplicitStringConcatenation = false # conflicts with ruff formatter
+
+[tool.uv]
+override-dependencies = [
+  "torch; sys_platform == 'never'",
+]
+exclude-newer = "7 days"
