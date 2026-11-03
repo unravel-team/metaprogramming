@@ -66,7 +66,7 @@ class ScaffoldContract(unittest.TestCase):
                 self.assertFalse(TARGETS - table.keys(), TARGETS - table.keys())
                 self.assertNotRegex(text.lower(), r"dafny|install-hooks|pre-push|\.git/hooks")
                 self.assertFalse({n for n in table if n.startswith(("install-", "ensure-"))})
-                self.assertFalse({"install", "sync", "venv", "localinstall", "deploy-lib"} & table.keys())
+                self.assertFalse({"sync", "venv", "localinstall", "deploy-lib"} & table.keys())
                 self.assertTrue({"check", "test"} <= table["build"])
                 self.assertNotIn("build-air", table["build"], "Sibling prerequisites can build before gates finish")
                 self.assertIn("check-format", table["check"])
@@ -81,7 +81,7 @@ class ScaffoldContract(unittest.TestCase):
                             continue
                         seen.add(name)
                         pending.extend(table.get(name, ()))
-                    self.assertNotIn("init", seen, target)
+                    self.assertFalse({"init", "install", "uninstall"} & seen, target)
                 publish = {"python": "deploy-pypi", "typescript": "deploy-npm", "golang": "deploy-go", "clojure": "deploy-clojars"}[language]
                 self.assertIn(publish, table)
                 result = run(["make", "--no-print-directory", "help"], ROOT / language)

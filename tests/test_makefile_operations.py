@@ -114,6 +114,70 @@ class MakefileOperations(unittest.TestCase):
             self.assertIn("--ignore-scripts", (base / "calls").read_text())
 
 
+class MakefileInstallation(unittest.TestCase):
+    @contextmanager
+    def go_installation(self):
+        with fixture("golang") as (root, env, base):
+            env["HOME"] = str(base / "temporary home")
+            fake_tool(base / "tools", "go", '''
+if [ "${FAIL_GATE:-}" = 1 ] && [ "$*" = "mod verify" ]; then exit 19; fi
+printf '%s\\n' "$*" >> "$CALLS"
+if [ "$1" = build ]; then
+    while [ "$1" != -o ]; do shift; done
+    shift
+    printf '#!/bin/sh\\nprintf installed-cli\\n' > "$1"
+fi
+''')
+            fake_tool(base / "tools", "gofmt", "exit 0")
+            fake_tool(base / "tools", "tagref", "exit 0")
+            fake_tool(root / ".tools/bin", "golangci-lint", "exit 0")
+            yield root, env, base
+
+    def test_go_install_and_uninstall_destinations(self):
+        for mode in ("default", "prefix", "bindir"):
+            with self.subTest(mode=mode), self.go_installation() as (root, env, base):
+                arguments = []
+                destination = Path(env["HOME"]) / ".local/bin"
+                if mode == "prefix":
+                    destination = base / "custom prefix/bin"
+                    arguments = [f"PREFIX={destination.parent}"]
+                elif mode == "bindir":
+                    destination = base / "custom bin"
+                    arguments = [f"PREFIX={base / 'unused'}", f"BINDIR={destination}"]
+                result = make(root, env, "install", *arguments)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                installed = destination / "golang"
+                self.assertEqual(installed.read_bytes(), (root / "bin/golang").read_bytes())
+                self.assertEqual(installed.stat().st_mode & 0o777, 0o755)
+                execution = subprocess.run([str(installed)], capture_output=True, text=True, timeout=5)
+                self.assertEqual((execution.returncode, execution.stdout), (0, "installed-cli"))
+                sentinel = destination / "unrelated"
+                sentinel.write_text("preserve")
+                (base / "calls").unlink()
+                for _ in range(2):
+                    result = make(root, env, "uninstall", *arguments)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertFalse(installed.exists())
+                self.assertEqual(sentinel.read_text(), "preserve")
+                self.assertFalse((base / "calls").exists(), "Uninstall must not build or test")
+                help_result = make(root, env, "help")
+                self.assertEqual(help_result.returncode, 0, help_result.stderr)
+                for target in ("install", "uninstall"):
+                    self.assertTrue(any(line.split()[0] == target for line in help_result.stdout.splitlines()))
+
+    def test_go_failed_build_gate_preserves_existing_installation(self):
+        with self.go_installation() as (root, env, base):
+            destination = Path(env["HOME"]) / ".local/bin/golang"
+            destination.parent.mkdir(parents=True)
+            destination.write_text("existing installation")
+            env["FAIL_GATE"] = "1"
+            result = make(root, env, "install")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Error 19", result.stderr)
+            self.assertEqual(destination.read_text(), "existing installation")
+            self.assertFalse((root / "bin/golang").exists())
+
+
 class MakefileCaches(unittest.TestCase):
     def test_project_caches_are_excluded_from_docker_contexts(self):
         for language in ("python", "typescript", "golang"):

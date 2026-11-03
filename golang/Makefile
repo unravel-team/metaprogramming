@@ -19,6 +19,8 @@ GOLANGCI_LINT := $(TOOLS_BIN)/golangci-lint
 VERSION_SCRIPT := scripts/release.sh
 PLACEHOLDER_APP := replace-with-your-fly-app-name
 PLACEHOLDER_MODULE := example.com/golang-scaffold
+PREFIX ?= $(HOME)/.local
+BINDIR ?= $(PREFIX)/bin
 
 .PHONY: help
 help: ## Show scaffold workflow targets
@@ -114,6 +116,15 @@ test-coverage: ## Write atomic profile, function summary, and HTML for all but i
 build: check test ## Validate gates, then build runnable Fly application artifact
 	@mkdir -p bin
 	@go build -mod=readonly -o bin/golang ./cmd/golang
+
+.PHONY: install
+install: build ## Build with gates, then install golang into BINDIR (default ~/.local/bin); no sudo
+	@install -d "$(BINDIR)"
+	@install -m 755 bin/golang "$(BINDIR)/golang"
+
+.PHONY: uninstall
+uninstall: ## Remove golang from BINDIR (default ~/.local/bin); no sudo
+	@rm -f -- "$(BINDIR)/golang"
 
 .PHONY: build-air
 build-air: ## Build Air reload binary only; normal quality gates do not run on reload
