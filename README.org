@@ -56,6 +56,7 @@ maintenance and review resulting metadata and lock changes.
 | =test-all=             | Run every test category. |
 | =test-coverage=        | Write coverage separately from normal tests. |
 | =build=                | Wait for =check= and default =test= before artifact creation; gates may run concurrently. |
+| =install= / =uninstall= | CLI projects: install after =build= / remove the installed CLI. Present in Go; optional in Python after adding a CLI entry point. |
 | =audit-deps=           | Networked advisory scan, separate from offline checks. |
 | =ci=                   | Run =check=, default =test=, and =audit-deps=. |
 | =clean= / =clean-cache=| Remove generated artifacts / language-specific caches. |
@@ -108,6 +109,62 @@ after exact =yes=. EOF, refusal, and every other response preserve volumes.
 All deployed containers bind =0.0.0.0:8080= and expose =GET /health=. =make
 deploy= builds locally, rejects placeholder Fly app identity, then calls Fly. No
 normal verification, release, or publication target deploys automatically.
+
+* CLI installation and bundled agent skills
+
+A CLI is a tool you run from a shell. Projects that ship one expose =make install=
+and =make uninstall= in their README and =make help=. Installation is explicit.
+Normal =check=, =test=, =build=, =release=, and =ci= never install the CLI.
+=make init= still sets up project dependencies, not user commands.
+
+=make build= runs checks and default tests before it creates the artifact.
+=make install= depends on =build=, then installs for the current user without =sudo=.
+The default is =~/.local/bin=. Set =PREFIX= to change the default prefix or
+=BINDIR= to set the destination directly. =BINDIR= takes precedence.
+Use the same override for =make uninstall=. Add the destination to your shell's =PATH=.
+
+Go copies =bin/golang= with executable permissions. Rename that path and both targets
+when you rename the command. Python has no CLI entry point, so its template documents
+optional targets instead. After adding =[project.scripts]=, use =uv tool install --force .=
+from the built project with =UV_TOOL_BIN_DIR=$(BINDIR)=. Remove the installed package
+with =uv tool uninstall <package-name>= using the same environment.
+See each language README for the targets or recipe.
+
+If the CLI ships an agent skill, bundle the skill in the binary or package data.
+It must work without a source checkout. Expose these commands in =--help=:
+
+#+begin_src text
+<tool> skill setup [--project [DIR]] [--force]
+<tool> skill remove [--project [DIR]]
+<tool> skill show
+#+end_src
+
+=skill setup= writes real files, not symlinks, to both agent locations:
+
+| Scope | Claude directory | Pi directory |
+|-------+------------------+--------------|
+| User (default) | =~/.claude/skills/<tool>/= | =~/.pi/agent/skills/<tool>/= |
+| =--project [DIR]= | =DIR/.claude/skills/<tool>/= | =DIR/.pi/skills/<tool>/= |
+
+=DIR= defaults to the current directory. It must itself be a project root, marked
+by =.git=, =.jj=, or a project manifest. Do not silently select an ancestor.
+Pi's installed =dist/core/skills.js= loads project skills from =.pi/skills=.
+Its =dist/config.js= defines =.pi= as the default configuration directory.
+
+Keep =SKILL.md= frontmatter unchanged. Write a separate =.<tool>-skill-setup= file
+inside each installed folder. Its first line is exactly
+=Installed by <tool> skill setup <version>=, with the tool name and version substituted.
+Repeated setup is safe: it updates its own managed copy. It refuses an existing
+symlink or handmade folder unless =--force= and reports exactly what it found.
+=skill remove= removes only managed copies. =skill show= prints the bundled =SKILL.md=.
+None of these commands accesses the store or network.
+
+Test both scopes with temporary =HOME= and project directories. Cover omitted and
+explicit =DIR=, invalid roots, repeated setup, version updates, unmanaged folders,
+symlinks, =--force=, managed-only removal, and =show=. Test =make install= destinations,
+permissions, build-gate failure, and uninstall without touching real user directories.
+The =rem= and =contextd= projects implement this convention. The templates do not
+add skill commands to applications that ship no skill.
 
 * Version, release, and publication
 
