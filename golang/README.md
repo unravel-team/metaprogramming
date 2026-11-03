@@ -104,6 +104,42 @@ Make commands use project-local `GOCACHE=.cache/go-build`. `make clean-cache`
 clears only that build/test cache and rejects symlinked cache paths. Shared build
 and module caches remain untouched.
 
+## Install the executable
+
+`make build` runs check and default test gates, then writes `bin/golang`.
+`make install` depends on that build and copies the executable to `~/.local/bin/golang`.
+It creates the destination directory and sets executable permissions. It never uses `sudo`.
+Add `~/.local/bin` to your shell's `PATH` if needed.
+`make uninstall` removes only the installed `golang` executable. It does not run a build.
+Both targets appear in `make help`.
+
+Override the destination with `PREFIX` or `BINDIR`. `BINDIR` takes precedence:
+
+```sh
+make install PREFIX="$HOME/tools"
+make uninstall PREFIX="$HOME/tools"
+make install BINDIR="$HOME/tools/bin"
+make uninstall BINDIR="$HOME/tools/bin"
+```
+
+When you rename the scaffold command, update the build path and both targets together.
+Installation is explicit. Normal checks, tests, builds, releases, and deployment do not install the executable.
+
+If your CLI ships an agent skill, bundle its files inside the binary.
+Expose `<tool> skill setup [--project [DIR]] [--force]`, `skill remove [--project [DIR]]`, and `skill show` in `--help`.
+The commands must work without a source checkout and must not access the store or network.
+User setup writes real files to `~/.claude/skills/<tool>/` and `~/.pi/agent/skills/<tool>/`.
+Project setup uses `DIR/.claude/skills/<tool>/` and `DIR/.pi/skills/<tool>/`.
+`DIR` defaults to the current directory and must itself contain `.git`, `.jj`, or a project manifest.
+Do not silently select an ancestor. The installed Pi loader confirms `.pi/skills` as its project skill path.
+
+Keep a `.<tool>-skill-setup` marker inside each installed folder, separate from `SKILL.md` so its YAML frontmatter remains valid.
+The marker's first line is `Installed by <tool> skill setup <version>`, with the tool name and version substituted.
+Repeated setup updates managed copies. Refuse existing symlinks or handmade folders unless `--force`, and report exactly what exists.
+Remove only managed copies. `skill show` prints the bundled `SKILL.md`.
+Test setup, updates, refusal, force, removal, and show with temporary home and project directories.
+The scaffold does not include a skill or these commands. Add them only when your CLI ships a skill.
+
 ## Build, release, and deploy safety
 
 Customize Fly app name before `make deploy`; placeholder identity is rejected. Build
