@@ -53,6 +53,48 @@ Alembic uses its local default. Create revisions with:
 `make infra-down-clean` always prints data-loss warning and reads confirmation;
 only exact `yes` removes volumes. No bypass variable exists.
 
+## Optional CLI installation
+
+This template has no CLI entry point, so its Makefile has no install or uninstall targets.
+If your project ships a CLI, declare it under `[project.scripts]` and add these targets.
+Replace `your-package-name` with the package name from `pyproject.toml`, not the command name.
+The `##` comments expose both targets in `make help`.
+
+  ```makefile
+  PREFIX ?= $(HOME)/.local
+  BINDIR ?= $(PREFIX)/bin
+
+  .PHONY: install
+  install: build; @UV_TOOL_BIN_DIR="$(BINDIR)" uv tool install --force . ## Build with gates, then install the CLI; no sudo
+
+  .PHONY: uninstall
+  uninstall: ; @UV_TOOL_BIN_DIR="$(BINDIR)" uv tool uninstall your-package-name ## Remove the CLI package; no sudo
+  ```
+
+`install: build` runs checks and default tests before it builds the wheel and source distribution.
+UV then installs the package in an isolated tool environment.
+The default executable directory is `~/.local/bin`. Add it to your shell's `PATH`.
+Use `PREFIX="$HOME/tools"` or `BINDIR="$HOME/tools/bin"` to override it.
+`BINDIR` takes precedence. Use the same override for uninstall. Never use `sudo`.
+Normal checks, tests, builds, releases, and deployment must not install the CLI.
+
+If your CLI ships an agent skill, include its files as package data.
+Expose `<tool> skill setup [--project [DIR]] [--force]`, `skill remove [--project [DIR]]`, and `skill show` in `--help`.
+The commands must work without a checkout and must not access the store or network.
+User setup writes real files to `~/.claude/skills/<tool>/` and `~/.pi/agent/skills/<tool>/`.
+Project setup writes to `DIR/.claude/skills/<tool>/` and `DIR/.pi/skills/<tool>/`.
+The installed Pi loader confirms `.pi/skills` as its project skill path.
+`DIR` defaults to the current directory and must itself contain `.git`, `.jj`, or a project manifest.
+Do not silently select an ancestor.
+
+Keep a `.<tool>-skill-setup` marker inside each installed folder.
+Its first line is `Installed by <tool> skill setup <version>`, with the tool name and version substituted.
+Keep `SKILL.md` frontmatter unchanged.
+Repeated setup updates managed copies. Refuse symlinks and handmade folders unless `--force`, and report exactly what exists.
+Remove only managed copies. `skill show` prints the bundled `SKILL.md`.
+Test both scopes, updates, refusal, force, removal, and show with temporary home and project directories.
+These skill commands are optional and are not part of this web template.
+
 ## Build, release, and deploy safety
 
 `make build` waits for check and default test gates, then writes package

@@ -90,6 +90,29 @@ exact `yes`; EOF, refusal, or any other response keeps local data.
 `clean` removes generated build and coverage artifacts separately from cache cleanup.
 All `clean-cache` targets reject symlinked paths/ancestors before deleting caches.
 
+## User CLI installation and agent skills
+
+Go supplies `make install` and `make uninstall` because it builds the executable `bin/golang`.
+Installation depends on `build`, including its check and test gates.
+It copies the executable to `~/.local/bin` without `sudo`.
+`PREFIX` changes the prefix and `BINDIR` overrides the executable directory.
+Uninstall removes only that executable and does not build.
+
+Python has no `[project.scripts]` entry point. Its README documents optional targets
+for CLI projects instead of adding unusable targets to the web template.
+After adding an entry point, install with `UV_TOOL_BIN_DIR="$(BINDIR)" uv tool install --force .`
+after `build`. Uninstall with `uv tool uninstall <package-name>` using the same environment.
+TypeScript and Clojure retain their existing app/library workflows.
+
+If a CLI ships an agent skill, it bundles the skill without requiring a checkout.
+The convention is `<tool> skill setup [--project [DIR]] [--force]`,
+`skill remove [--project [DIR]]`, and `skill show`.
+User destinations are `~/.claude/skills/<tool>/` and `~/.pi/agent/skills/<tool>/`.
+Project destinations are `DIR/.claude/skills/<tool>/` and `DIR/.pi/skills/<tool>/`.
+The ownership marker is a separate `.<tool>-skill-setup` file, not a prefix in `SKILL.md`.
+See `README.org` for root validation, overwrite rules, and temporary-directory tests.
+These commands do not touch the store or network.
+
 ## Versions, release, and publication
 
 Across languages, `version` prints plain semantic version; `major`, `minor`, and
